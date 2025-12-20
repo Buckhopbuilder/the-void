@@ -1,11 +1,182 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>The Void</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>THE VOID</title>
+  <style>
+    :root {
+      --bg: #05060a;
+      --panel: rgba(255,255,255,0.06);
+      --panel2: rgba(255,255,255,0.10);
+      --text: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.65);
+      --danger: rgba(255,120,120,0.95);
+      --ok: rgba(150,255,190,0.95);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      color: var(--text);
+      background: radial-gradient(900px 900px at 50% 35%, rgba(120,110,255,0.22), transparent 60%),
+                  radial-gradient(700px 700px at 50% 45%, rgba(0,0,0,0.0), rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.9) 100%),
+                  var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .wrap { width: 100%; max-width: 440px; }
+    .brand {
+      text-align: center;
+      margin-bottom: 18px;
+      letter-spacing: 0.22em;
+      font-weight: 700;
+      font-size: 34px;
+    }
+    .sub {
+      text-align: center;
+      color: var(--muted);
+      margin: 0 0 22px 0;
+      line-height: 1.35;
+    }
+    .panel {
+      background: var(--panel);
+      border: 1px solid rgba(255,255,255,0.10);
+      border-radius: 16px;
+      padding: 18px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 10px 50px rgba(0,0,0,0.45);
+    }
+    label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin: 14px 0 6px;
+    }
+    input {
+      width: 100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.35);
+      color: var(--text);
+      outline: none;
+    }
+    input:focus {
+      border-color: rgba(160,150,255,0.55);
+      box-shadow: 0 0 0 3px rgba(160,150,255,0.12);
+    }
+    .btn {
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px 14px;
+      border: 1px solid rgba(255,255,255,0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+      color: var(--text);
+      border-radius: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+    }
+    .note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .msg {
+      margin-top: 14px;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,0.14);
+      background: var(--panel2);
+      display: none;
+      line-height: 1.35;
+    }
+    .msg.ok { border-color: rgba(150,255,190,0.35); color: var(--ok); }
+    .msg.bad { border-color: rgba(255,120,120,0.35); color: var(--danger); }
+    .tiny {
+      margin-top: 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+    }
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.10);
+      margin: 16px 0;
+    }
+  </style>
 </head>
 <body>
-  <h1>The Void</h1>
-  <p>Registration opens soon.</p>
+  <div class="wrap">
+    <div class="brand">THE VOID</div>
+    <p class="sub">Register for access.<br/>Location unlocks at <strong>12:00 AM</strong>.</p>
+
+    <div class="panel">
+      <form id="regForm">
+        <label for="fullName">Full name</label>
+        <input id="fullName" name="fullName" autocomplete="name" required />
+
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" autocomplete="email" required />
+
+        <button class="btn" id="submitBtn" type="submit">Register</button>
+
+        <div class="msg ok" id="okMsg">Check your email to confirm your registration.</div>
+        <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
+
+        <div class="divider"></div>
+
+        <div class="note">
+          We use your name and email to verify registration, issue a unique entry QR, send the location at midnight,
+          and manage door entry. Registration data is deleted within 72 hours after the event.
+        </div>
+      </form>
+    </div>
+
+    <div class="tiny">Tully Console • Internal build</div>
+  </div>
+
+  <script>
+    const form = document.getElementById("regForm");
+    const okMsg = document.getElementById("okMsg");
+    const badMsg = document.getElementById("badMsg");
+    const submitBtn = document.getElementById("submitBtn");
+
+    function show(el) { el.style.display = "block"; }
+    function hide(el) { el.style.display = "none"; }
+
+    // FRONT-END ONLY for now: simulates success.
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      hide(okMsg); hide(badMsg);
+
+      const fullName = document.getElementById("fullName").value.trim();
+      const email = document.getElementById("email").value.trim();
+
+      if (!fullName || !email) {
+        show(badMsg);
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Registering…";
+
+      // simulate network delay
+      await new Promise(r => setTimeout(r, 600));
+
+      show(okMsg);
+      submitBtn.disabled = false;
+      submitBtn.textContent = "Register";
+      form.reset();
+    });
+  </script>
 </body>
 </html>
