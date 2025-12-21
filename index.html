@@ -80,10 +80,7 @@
       font-weight: 600;
       cursor: pointer;
     }
-    .btn:disabled {
-      opacity: 0.55;
-      cursor: not-allowed;
-    }
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
     .note {
       margin-top: 14px;
       font-size: 12px;
@@ -129,7 +126,7 @@
 
         <button class="btn" id="submitBtn" type="submit">Register</button>
 
-        <div class="msg ok" id="okMsg">Check your email to confirm your registration.</div>
+        <div class="msg ok" id="okMsg">Registered. (Email confirmation is not implemented yet.)</div>
         <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
 
         <div class="divider"></div>
@@ -145,6 +142,15 @@
   </div>
 
   <script>
+    // ===== CONFIG (Browser) =====
+    // Supabase project URL provided by you:
+    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+    // Paste your anon key here (public):
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+
+    // Edge function endpoint:
+    const REGISTER_URL = `${SUPABASE_URL}/functions/v1/register`;
+
     const form = document.getElementById("regForm");
     const okMsg = document.getElementById("okMsg");
     const badMsg = document.getElementById("badMsg");
@@ -153,7 +159,17 @@
     function show(el) { el.style.display = "block"; }
     function hide(el) { el.style.display = "none"; }
 
-    // FRONT-END ONLY for now: simulates success.
+    function setBusy(isBusy) {
+      submitBtn.disabled = isBusy;
+      submitBtn.textContent = isBusy ? "Registering…" : "Register";
+    }
+
+    function setBad(message) {
+      badMsg.textContent = message || "Something went wrong. Please try again.";
+      show(badMsg);
+    }
+
+    // Browser -> Edge Function -> DB
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       hide(okMsg); hide(badMsg);
@@ -162,21 +178,55 @@
       const email = document.getElementById("email").value.trim();
 
       if (!fullName || !email) {
-        show(badMsg);
+        setBad("Please enter a full name and email.");
         return;
       }
 
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Registering…";
+      // Hard fail early if you forgot to paste the anon key.
+      if (!SUPABASE_ANON_KEY || SUPABASE_ANON_KEY.includes("PASTE_YOUR")) {
+        setBad("Config missing: paste SUPABASE_ANON_KEY into index.html");
+        return;
+      }
 
-      // simulate network delay
-      await new Promise(r => setTimeout(r, 600));
+      setBusy(true);
 
-      show(okMsg);
-      submitBtn.disabled = false;
-      submitBtn.textContent = "Register";
-      form.reset();
+      try {
+        const payload = { fullName, email };
+
+        const res = await fetch(REGISTER_URL, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+            "apikey": SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await res.text();
+        let data;
+        try { data = text ? JSON.parse(text) : null; } catch { data = { raw: text }; }
+
+        console.log("[register] status:", res.status);
+        console.log("[register] response:", data);
+
+        if (!res.ok) {
+          // show server error message if any
+          const msg = (data && (data.error || data.message)) ? (data.error || data.message) : `Register failed (${res.status})`;
+          setBad(msg);
+          return;
+        }
+
+        show(okMsg);
+        form.reset();
+      } catch (err) {
+        console.log("[register] network error:", err);
+        setBad("Network error calling register function.");
+      } finally {
+        setBusy(false);
+      }
     });
   </script>
 </body>
 </html>
+
