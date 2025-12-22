@@ -191,8 +191,7 @@
       setBusy(true);
 
       try {
-        const payload = { fullName, email };
-
+        const payload = { full_name: fullName, email };
         const res = await fetch(REGISTER_URL, {
           method: "POST",
           headers: {
