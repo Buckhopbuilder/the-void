@@ -285,8 +285,7 @@
       if (!message) return;
       okMsg.style.display = "block";
       // Replace only the leading text node (keeps the "Change email" link intact)
-      if (okMsg.firstChild) okMsg.firstChild.textContent = message + " ";      
-          
+      if (okMsg.firstChild) okMsg.firstChild.textContent = message + " ";
     }
 
     function setBad(message) {
@@ -491,6 +490,8 @@
         }
 
         keysToRemove.forEach((k) => localStorage.removeItem(k));
+        applyFormUI();
+        clearMessages();
         location.reload();
       });
     }
