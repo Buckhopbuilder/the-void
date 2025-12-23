@@ -436,7 +436,7 @@
 
       setBusy(true);
       try {
-        const payload = { name, email };
+        const payload = { full_name: name, email };
         const r = await fetch(REGISTER_FN, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
