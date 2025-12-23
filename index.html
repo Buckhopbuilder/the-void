@@ -2,63 +2,56 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>THE VOID</title>
   <style>
     :root {
-      --bg: #0b0b0b;
+      --bg: #05060a;
       --panel: rgba(255,255,255,0.06);
-      --panelBorder: rgba(255,255,255,0.12);
+      --panel2: rgba(255,255,255,0.10);
       --text: rgba(255,255,255,0.92);
-      --muted: rgba(255,255,255,0.70);
-      --danger: #ff5a5f;
-      --ok: #2ee59d;
-      --btn: rgba(255,255,255,0.10);
-      --btnBorder: rgba(255,255,255,0.20);
-      --btnHover: rgba(255,255,255,0.14);
+      --muted: rgba(255,255,255,0.65);
+      --danger: rgba(255,120,120,0.95);
+      --ok: rgba(150,255,190,0.95);
     }
     * { box-sizing: border-box; }
     html, body { height: 100%; }
     body {
       margin: 0;
-      background: radial-gradient(1200px 700px at 50% 20%, rgba(255,255,255,0.06), transparent 60%),
-                  radial-gradient(900px 900px at 10% 90%, rgba(255,255,255,0.03), transparent 60%),
-                  var(--bg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
       color: var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      display: grid;
-      place-items: center;
-      padding: 18px;
+      background: radial-gradient(900px 900px at 50% 35%, rgba(120,110,255,0.22), transparent 60%),
+                  radial-gradient(700px 700px at 50% 45%, rgba(0,0,0,0.0), rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.9) 100%),
+                  var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
     }
-    .wrap {
-      width: 100%;
-      max-width: 520px;
-      text-align: center;
-    }
+    .wrap { width: 100%; max-width: 440px; }
     .brand {
-      font-weight: 900;
-      letter-spacing: 0.14em;
-      font-size: 22px;
-      margin-bottom: 10px;
-      user-select: none;
+      text-align: center;
+      margin-bottom: 18px;
+      letter-spacing: 0.22em;
+      font-weight: 700;
+      font-size: 34px;
     }
     .sub {
-      margin: 0;
+      text-align: center;
       color: var(--muted);
-      line-height: 1.5;
-      font-size: 14px;
+      margin: 0 0 22px 0;
+      line-height: 1.35;
     }
     .panel {
-      margin-top: 18px;
-      padding: 18px 16px;
       background: var(--panel);
-      border: 1px solid var(--panelBorder);
+      border: 1px solid rgba(255,255,255,0.10);
       border-radius: 16px;
+      padding: 18px;
       backdrop-filter: blur(10px);
+      box-shadow: 0 10px 50px rgba(0,0,0,0.45);
     }
     label {
       display: block;
-      text-align: left;
       font-size: 12px;
       color: var(--muted);
       margin: 14px 0 6px;
@@ -67,91 +60,103 @@
       width: 100%;
       padding: 12px 12px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.15);
+      background: rgba(0,0,0,0.35);
       color: var(--text);
       outline: none;
-      font-size: 14px;
     }
     input:focus {
-      border-color: rgba(255,255,255,0.30);
-      box-shadow: 0 0 0 3px rgba(255,255,255,0.06);
+      border-color: rgba(160,150,255,0.55);
+      box-shadow: 0 0 0 3px rgba(160,150,255,0.12);
     }
     .btn {
       width: 100%;
       margin-top: 16px;
       padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid var(--btnBorder);
-      background: var(--btn);
+      border: 1px solid rgba(255,255,255,0.18);
+      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
       color: var(--text);
+      border-radius: 14px;
+      font-weight: 600;
       cursor: pointer;
-      font-weight: 800;
-      letter-spacing: 0.04em;
-      transition: background 150ms ease, transform 120ms ease;
     }
-    .btn:hover { background: var(--btnHover); }
-    .btn:active { transform: translateY(1px); }
-    .msg {
-      display: none;
+    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+    .note {
       margin-top: 14px;
-      font-size: 13px;
-      line-height: 1.5;
-      padding: 10px 12px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+    .msg {
+      margin-top: 14px;
+      padding: 12px;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.14);
-      background: rgba(0,0,0,0.25);
-      text-align: left;
+      background: var(--panel2);
+      display: none;
+      line-height: 1.35;
     }
-    .msg.ok { border-color: rgba(46,229,157,0.35); color: rgba(46,229,157,0.95); }
-    .msg.bad { border-color: rgba(255,90,95,0.35); color: rgba(255,90,95,0.95); }
-    .hint {
-      margin-top: 12px;
-      color: rgba(255,255,255,0.52);
-      font-size: 12px;
-      line-height: 1.45;
+    .msg.ok { border-color: rgba(150,255,190,0.35); color: var(--ok); }
+    .msg.bad { border-color: rgba(255,120,120,0.35); color: var(--danger); }
+    .tiny {
+      margin-top: 10px;
+      font-size: 11px;
+      color: rgba(255,255,255,0.55);
+      text-align: center;
+    }
+    .divider {
+      height: 1px;
+      background: rgba(255,255,255,0.10);
+      margin: 16px 0;
     }
 
     /* ===== Cinematic final seconds overlay ===== */
     .void-overlay{
-      position:fixed;inset:0;z-index:9999;pointer-events:none;
-      background:#000;
-      opacity:0;
-      clip-path:circle(0% at 50% 50%);
-      transition:opacity 250ms ease;
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      background: #000;
+      opacity: 0;
+      clip-path: circle(0% at 50% 50%);
+      transition: opacity 250ms ease;
     }
-    .void-overlay.is-arming{opacity:1;}
+    .void-overlay.is-arming { opacity: 1; }
     .void-overlay.is-armed{
-      opacity:1;
-      clip-path:circle(150% at 50% 50%);
-      transition:clip-path 1200ms ease, opacity 250ms ease;
+      opacity: 1;
+      clip-path: circle(150% at 50% 50%);
+      transition: clip-path 1200ms ease, opacity 250ms ease;
     }
     .void-overlay__text{
-      position:absolute;inset:0;display:grid;place-items:center;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      font-weight:800;
-      letter-spacing:0.6px;
-      font-size:clamp(22px, 3.3vw, 38px);
-      color:rgba(255,255,255,0.92);
-      opacity:0;
-      transform:translateY(8px);
-      transition:opacity 700ms ease, transform 700ms ease;
-      text-align:center;
-      padding:0 18px;
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      padding: 0 18px;
+      font-weight: 800;
+      letter-spacing: 0.6px;
+      font-size: clamp(22px, 3.3vw, 38px);
+      color: rgba(255,255,255,0.92);
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 700ms ease, transform 700ms ease;
     }
-    .void-overlay.is-armed .void-overlay__text{opacity:1;transform:translateY(0);}
+    .void-overlay.is-armed .void-overlay__text{
+      opacity: 1;
+      transform: translateY(0);
+    }
     .void-overlay__sub{
-      display:block;
-      margin-top:10px;
-      font-size:clamp(14px, 2.2vw, 18px);
-      font-weight:600;
-      letter-spacing:0.4px;
-      color:rgba(255,255,255,0.72);
+      display: block;
+      margin-top: 10px;
+      font-size: clamp(14px, 2.2vw, 18px);
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      color: rgba(255,255,255,0.72);
     }
-
     @media (prefers-reduced-motion: reduce){
-      .void-overlay,.void-overlay__text{transition:none !important;}
-      .void-overlay.is-armed{clip-path:none;}
+      .void-overlay, .void-overlay__text { transition: none !important; }
+      .void-overlay.is-armed { clip-path: none; }
     }
   </style>
 </head>
@@ -171,19 +176,24 @@
 
         <button class="btn" id="submitBtn" type="submit">Register</button>
 
-        <div class="msg ok" id="okMsg"></div>
-        <div class="msg bad" id="badMsg"></div>
-      </form>
+        <div class="msg ok" id="okMsg">Registered. (Email confirmation is not implemented yet.)</div>
+        <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
 
-      <div class="hint" id="hintText">
-        You’ll receive the location by email at reveal time. Check spam if you don’t see it.
-      </div>
+        <div class="divider"></div>
+
+        <div class="note">
+          We collect your name and email only to manage access to this event.<br/>
+          Your details are automatically deleted shortly after the event ends.
+        </div>
+      </form>
     </div>
+
+    <div class="tiny">Tully Console • Internal build</div>
   </div>
 
   <!-- Cinematic final seconds overlay -->
   <div id="voidOverlay" class="void-overlay" aria-hidden="true">
-    <div class="void-overlay__text" id="voidOverlayText">
+    <div class="void-overlay__text">
       The void has taken…
       <span class="void-overlay__sub">It remains.</span>
     </div>
@@ -192,7 +202,7 @@
   <script>
     // ===== CONFIG (Browser) =====
     const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXV...CI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
 
     // Edge function endpoint:
     const REGISTER_URL = `${SUPABASE_URL}/functions/v1/register`;
@@ -209,14 +219,13 @@
 
     const revealTextEl = document.getElementById("revealText");
     const countdownEl = document.getElementById("countdown");
-    const hintTextEl = document.getElementById("hintText");
 
     function show(el) { el.style.display = "block"; }
     function hide(el) { el.style.display = "none"; }
 
-    function setOk(msg) {
-      okMsg.textContent = msg;
-      show(okMsg);
+    function setBusy(isBusy) {
+      submitBtn.disabled = isBusy;
+      submitBtn.textContent = isBusy ? "Registering…" : "Register";
     }
 
     function setBad(msg) {
@@ -224,21 +233,15 @@
       show(badMsg);
     }
 
-    // ===== Reveal time + countdown (event-driven) =====
-    let revealTimer = null;
-
-    // ===== Cinematic overlay state =====
+    // ===== Cinematic overlay state (latched per event) =====
     const overlayEl = document.getElementById("voidOverlay");
-    const LS_EVENT_ID_KEY = "void_last_event_id";
-    const LS_LATCH_KEY = "void_overlay_latched_for_event";
+    const LS_LAST_ACTIVE_EVENT_ID = "void_last_event_id";
+    const LS_LATCHED_FOR_EVENT_ID = "void_overlay_latched_for_event_id";
     let currentActiveEventId = null;
 
     function armVoidOverlay() {
       if (!overlayEl) return;
-      if (!overlayEl.classList.contains("is-arming")) {
-        overlayEl.classList.add("is-arming");
-      }
-      // expand on next paint
+      if (!overlayEl.classList.contains("is-arming")) overlayEl.classList.add("is-arming");
       requestAnimationFrame(() => overlayEl.classList.add("is-armed"));
     }
 
@@ -247,15 +250,17 @@
       overlayEl.classList.remove("is-armed", "is-arming");
     }
 
-    function setOverlayLatched(eventId, latched) {
+    function latchOverlayForEvent(eventId) {
       if (!eventId) return;
-      if (latched) localStorage.setItem(LS_LATCH_KEY, eventId);
-      else localStorage.removeItem(LS_LATCH_KEY);
+      localStorage.setItem(LS_LATCHED_FOR_EVENT_ID, eventId);
     }
 
     function isOverlayLatchedForEvent(eventId) {
-      return localStorage.getItem(LS_LATCH_KEY) === eventId;
+      return localStorage.getItem(LS_LATCHED_FOR_EVENT_ID) === eventId;
     }
+
+    // ===== Reveal time + countdown (event-driven) =====
+    let revealTimer = null;
 
     function formatRevealTime(dateObj, tz) {
       // Show day + time in the event timezone (falls back to browser timezone)
@@ -276,21 +281,20 @@
         const now = new Date();
         const diffMs = revealAtDate - now;
 
-        // Seconds remaining until reveal
-        const totalSeconds = Math.floor(diffMs / 1000);
-
-        // Final seconds cinematic: fade to black from center and keep it latched after zero
-        if (totalSeconds <= 5) {
-          armVoidOverlay();
-        }
-
         if (diffMs <= 0) {
           countdownEl.textContent = "Reveal is happening now — check your email.";
-          if (currentActiveEventId) setOverlayLatched(currentActiveEventId, true);
-          armVoidOverlay();
+          if (currentActiveEventId) latchOverlayForEvent(currentActiveEventId);
+          armVoidOverlay(); // keep it on
           clearInterval(revealTimer);
           revealTimer = null;
           return;
+        }
+
+        const totalSeconds = Math.floor(diffMs / 1000);
+
+        // Arm cinematic in the last 5 seconds
+        if (totalSeconds <= 5) {
+          armVoidOverlay();
         }
 
         const days = Math.floor(totalSeconds / 86400);
@@ -306,6 +310,14 @@
         countdownEl.textContent = days > 0
           ? `Location reveals in ${days}d ${hh}h ${mm}m ${ss}s`
           : `Location reveals in ${hh}h ${mm}m ${ss}s`;
+      }
+
+      // Initial fill
+      revealTextEl.textContent = formatRevealTime(revealAtDate, tz);
+
+      // If we already latched for this event earlier, keep overlay on
+      if (currentActiveEventId && isOverlayLatchedForEvent(currentActiveEventId)) {
+        armVoidOverlay();
       }
 
       tick();
@@ -327,33 +339,31 @@
         });
 
         if (!res.ok) {
+          console.log("[event] status:", res.status);
+          const txt = await res.text();
+          console.log("[event] response:", txt);
           revealTextEl.textContent = "soon";
           countdownEl.textContent = "";
           return;
         }
 
         const rows = await res.json();
-        const ev = rows && rows.length ? rows[0] : null;
-
-        if (!ev) {
+        const ev = rows && rows[0];
+        if (!ev || !ev.reveal_at) {
           revealTextEl.textContent = "soon";
           countdownEl.textContent = "";
           return;
         }
 
-        // Reset overlay latch when the active event changes
-        const lastId = localStorage.getItem(LS_EVENT_ID_KEY);
-        if (ev.id && ev.id !== lastId) {
-          localStorage.setItem(LS_EVENT_ID_KEY, ev.id);
-          currentActiveEventId = ev.id;
-          setOverlayLatched(ev.id, false);
+        // Reset overlay latch if the active event changed
+        currentActiveEventId = ev.id || null;
+        const lastId = localStorage.getItem(LS_LAST_ACTIVE_EVENT_ID);
+        if (currentActiveEventId && currentActiveEventId !== lastId) {
+          localStorage.setItem(LS_LAST_ACTIVE_EVENT_ID, currentActiveEventId);
+          // New active event => overlay should NOT remain from previous event
           disarmVoidOverlay();
-        }
-        if (ev.id) currentActiveEventId = ev.id;
-
-        // If we already latched for this active event (reveal hit zero previously), keep overlay on
-        if (ev.id && isOverlayLatchedForEvent(ev.id)) {
-          armVoidOverlay();
+          // Note: we keep LS_LATCHED_FOR_EVENT_ID as the eventId it latched for.
+          // If it's a different event, isOverlayLatchedForEvent(newId) will be false anyway.
         }
 
         const tz = ev.timezone || "Australia/Sydney";
@@ -366,59 +376,69 @@
           return;
         }
 
-        revealTextEl.textContent = formatRevealTime(revealAtDate, tz);
         startCountdown(revealAtDate, tz);
       } catch (err) {
-        console.log("Failed to load active event:", err);
+        console.log("[event] load error:", err);
         revealTextEl.textContent = "soon";
         countdownEl.textContent = "";
       }
     }
 
-    // ===== Registration form submit =====
+    // Kick off on page load
+    loadActiveEventAndStartTimer();
+
+    // ===== Registration submit =====
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       hide(okMsg);
       hide(badMsg);
 
-      submitBtn.disabled = true;
-      submitBtn.textContent = "Registering…";
-
       const fullName = document.getElementById("fullName").value.trim();
       const email = document.getElementById("email").value.trim();
 
+      if (!fullName || !email) {
+        setBad("Please enter your full name and email.");
+        return;
+      }
+
+      setBusy(true);
+
       try {
+        const payload = { full_name: fullName, email };
+
         const res = await fetch(REGISTER_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ fullName, email })
+          headers: {
+            "Content-Type": "application/json",
+            "apikey": SUPABASE_ANON_KEY,
+            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+          },
+          body: JSON.stringify(payload)
         });
 
-        const data = await res.json().catch(() => ({}));
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+
+        console.log("[register] status:", res.status);
+        console.log("[register] response:", data);
 
         if (!res.ok) {
-          const msg = data && data.error ? data.error : "Registration failed.";
+          const msg = (data && (data.error || data.message))
+            ? (data.error || data.message)
+            : `Register failed (${res.status})`;
           setBad(msg);
-          submitBtn.disabled = false;
-          submitBtn.textContent = "Register";
           return;
         }
 
-        setOk("Registered. Check your email at reveal time.");
+        show(okMsg);
         form.reset();
       } catch (err) {
-        console.log("Registration error:", err);
-        setBad("Registration failed. Please try again.");
+        console.log("[register] network error:", err);
+        setBad("Network error calling register function.");
       } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = "Register";
+        setBusy(false);
       }
     });
-
-    // ===== Kick off =====
-    loadActiveEventAndStartTimer();
-    // Refresh active event every 15 seconds (lets page recover if organiser swaps events)
-    setInterval(loadActiveEventAndStartTimer, 15000);
   </script>
 </body>
 </html>
