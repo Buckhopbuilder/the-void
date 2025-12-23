@@ -109,7 +109,15 @@
       background: rgba(255,255,255,0.10);
       margin: 16px 0;
     }
-  </style>
+
+
+    /* Step B: Registered state (persisted per-event in localStorage) */
+    .msg.ok { text-align: center; }
+    #regForm.is-registered label,
+    #regForm.is-registered input,
+    #regForm.is-registered #submitBtn { display: none; }
+
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -176,6 +184,41 @@
       show(badMsg);
     }
 
+
+    // ===== Step B: "You're registered" state (per-event, stored in this browser) =====
+    let currentEventId = null;
+
+    function regKeyFor(eventId) {
+      return `voidpass_registered_${eventId}`;
+    }
+
+    function markRegistered(eventId, email) {
+      try {
+        const payload = {
+          email: email || null,
+          ts: new Date().toISOString()
+        };
+        localStorage.setItem(regKeyFor(eventId), JSON.stringify(payload));
+      } catch (e) {
+        // localStorage might be blocked; ignore
+      }
+    }
+
+    function isRegistered(eventId) {
+      if (!eventId) return false;
+      try {
+        return !!localStorage.getItem(regKeyFor(eventId));
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function applyRegisteredUI() {
+      form.classList.add("is-registered");
+      show(okMsg);
+      hide(badMsg);
+      setBusy(false);
+    }
     // ===== Reveal time + countdown (event-driven) =====
     let revealTimer = null;
 
@@ -258,6 +301,14 @@
           return;
         }
 
+
+        // Step B: keep track of the current event id for registration persistence
+        currentEventId = ev.id || null;
+
+        // If this browser has already registered for this event, show the registered state
+        if (isRegistered(currentEventId)) {
+          applyRegisteredUI();
+        }
         const tz = ev.timezone || "Australia/Sydney";
         const revealAtDate = new Date(ev.reveal_at);
 
@@ -322,7 +373,9 @@
           return;
         }
 
-        show(okMsg);
+        // Step B: Persist "registered" state for this event in this browser
+        markRegistered(currentEventId, email);
+        applyRegisteredUI();
         form.reset();
       } catch (err) {
         console.log("[register] network error:", err);
