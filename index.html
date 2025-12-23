@@ -272,16 +272,25 @@
       submitBtn.textContent = isBusy ? "Registering…" : "Register";
     }
 
-    function setOk(message) {
+    function clearMessages() {
+      okMsg.style.display = "none";
       badMsg.style.display = "none";
+    }
+
+    function setOk(message) {
+      clearMessages();
+      if (!message) return;
       okMsg.style.display = "block";
-      if (message) okMsg.firstChild.textContent = message;
+      // Replace only the leading text node (keeps the "Change email" link intact)
+      if (okMsg.firstChild) okMsg.firstChild.textContent = message + "
+          ";
     }
 
     function setBad(message) {
-      okMsg.style.display = "none";
+      clearMessages();
+      if (!message) return;
       badMsg.style.display = "block";
-      if (message) badMsg.textContent = message;
+      badMsg.textContent = message;
     }
 
     function regKeyFor(eventId) {
@@ -297,16 +306,24 @@
     function applyRegisteredUI() {
       form.classList.add("registered");
       submitBtn.classList.add("hidden");
-      document.getElementById("name").classList.add("hidden");
-      document.getElementById("email").classList.add("hidden");
+
+      const nameField = document.getElementById("name")?.closest(".field");
+      const emailField = document.getElementById("email")?.closest(".field");
+      if (nameField) nameField.classList.add("hidden");
+      if (emailField) emailField.classList.add("hidden");
+
       okMsg.style.display = "block";
     }
 
     function applyFormUI() {
       submitBtn.classList.remove("hidden");
-      document.getElementById("name").classList.remove("hidden");
-      document.getElementById("email").classList.remove("hidden");
+
+      const nameField = document.getElementById("name")?.closest(".field");
+      const emailField = document.getElementById("email")?.closest(".field");
+      if (nameField) nameField.classList.remove("hidden");
+      if (emailField) emailField.classList.remove("hidden");
     }
+
 
     function startCountdown(revealAtDate, tz) {
       if (countdownTimer) clearInterval(countdownTimer);
@@ -405,8 +422,7 @@
     // ----------------------------
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      setOk("");
-      setBad("");
+      clearMessages();
 
       if (!currentEventId) {
         setBad("No active event.");
