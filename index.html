@@ -390,14 +390,16 @@
         setBusy(false);
       }
     });
-     // --- Change email reset link ---
+   <script>
+     
+// --- Change email reset link ---
 const changeEmailLink = document.getElementById("changeEmailLink");
 
 if (changeEmailLink) {
   changeEmailLink.addEventListener("click", function (e) {
     e.preventDefault();
 
-    // Remove any saved "registered" state we might have stored (per-event or global)
+    // Remove any saved voidpass registration state
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
@@ -407,17 +409,11 @@ if (changeEmailLink) {
         keysToRemove.push(k);
       }
     }
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
 
+    keysToRemove.forEach((k) => localStorage.removeItem(k));
     location.reload();
   });
 }
-  keysToRemove.forEach((k) => localStorage.removeItem(k));
-
-  // Reload so the page re-runs from a clean state
-  location.reload();
-});
 </script>
 </body>
 </html>
-
