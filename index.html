@@ -12,375 +12,437 @@
       --panel2: rgba(255,255,255,0.10);
       --text: rgba(255,255,255,0.92);
       --muted: rgba(255,255,255,0.65);
-      --danger: rgba(255,120,120,0.95);
-      --ok: rgba(150,255,190,0.95);
+      --ok: rgba(120, 255, 180, 0.95);
+      --bad: rgba(255, 120, 140, 0.95);
+      --accent: rgba(160, 190, 255, 0.95);
+      --line: rgba(255,255,255,0.10);
+      --shadow: 0 20px 60px rgba(0,0,0,0.45);
     }
+
     * { box-sizing: border-box; }
     html, body { height: 100%; }
+
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
-      color: var(--text);
-      background: radial-gradient(900px 900px at 50% 35%, rgba(120,110,255,0.22), transparent 60%),
-                  radial-gradient(700px 700px at 50% 45%, rgba(0,0,0,0.0), rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.9) 100%),
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: radial-gradient(1200px 600px at 50% 30%, rgba(140,160,255,0.15), transparent 60%),
+                  radial-gradient(900px 500px at 20% 80%, rgba(120,255,200,0.08), transparent 60%),
+                  radial-gradient(900px 500px at 80% 80%, rgba(255,140,180,0.08), transparent 60%),
                   var(--bg);
+      color: var(--text);
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 24px;
+      padding: 22px;
     }
-    .wrap { width: 100%; max-width: 440px; }
+
+    .wrap {
+      width: 100%;
+      max-width: 560px;
+      padding: 22px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.03));
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 22px 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
+    }
+
     .brand {
-      text-align: center;
-      margin-bottom: 18px;
-      letter-spacing: 0.22em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      letter-spacing: 0.2em;
       font-weight: 700;
-      font-size: 34px;
     }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.75);
+      box-shadow: 0 0 24px rgba(160,190,255,0.55);
+    }
+
+    h1 {
+      margin: 10px 0 6px;
+      text-align: center;
+      font-size: 22px;
+      letter-spacing: 0.08em;
+    }
+
     .sub {
+      margin: 0 0 14px;
       text-align: center;
       color: var(--muted);
-      margin: 0 0 22px 0;
-      line-height: 1.35;
+      font-size: 14px;
+      line-height: 1.4;
     }
-    .panel {
-      background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.10);
-      border-radius: 16px;
-      padding: 18px;
-      backdrop-filter: blur(10px);
-      box-shadow: 0 10px 50px rgba(0,0,0,0.45);
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: 16px 0;
     }
+
+    .row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
     label {
       display: block;
       font-size: 12px;
       color: var(--muted);
-      margin: 14px 0 6px;
+      margin-bottom: 6px;
     }
+
     input {
       width: 100%;
       padding: 12px 12px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.15);
-      background: rgba(0,0,0,0.35);
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.25);
       color: var(--text);
       outline: none;
     }
+
     input:focus {
-      border-color: rgba(160,150,255,0.55);
-      box-shadow: 0 0 0 3px rgba(160,150,255,0.12);
+      border-color: rgba(160,190,255,0.45);
+      box-shadow: 0 0 0 4px rgba(160,190,255,0.08);
     }
+
+    .field { flex: 1 1 240px; }
+
     .btn {
       width: 100%;
-      margin-top: 16px;
-      padding: 12px 14px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
+      border: 0;
+      background: rgba(160,190,255,0.18);
       color: var(--text);
-      border-radius: 14px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-    .note {
-      margin-top: 14px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
-    .msg {
-      margin-top: 14px;
-      padding: 12px;
+      padding: 12px 14px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: var(--panel2);
-      display: none;
-      line-height: 1.35;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: transform .05s ease, background .2s ease;
+      margin-top: 12px;
     }
-    .msg.ok { border-color: rgba(150,255,190,0.35); color: var(--ok); }
-    .msg.bad { border-color: rgba(255,120,120,0.35); color: var(--danger); }
-    .tiny {
-      margin-top: 10px;
-      font-size: 11px;
-      color: rgba(255,255,255,0.55);
+
+    .btn:hover { background: rgba(160,190,255,0.24); }
+    .btn:active { transform: translateY(1px); }
+
+    .btn[disabled] {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    .msg {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,0.22);
+      display: none;
+      text-align: center;
+      line-height: 1.4;
+    }
+    .msg.ok { color: var(--ok); }
+    .msg.bad { color: var(--bad); }
+
+    .eventBox {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 12px 12px;
+      background: rgba(0,0,0,0.20);
+    }
+
+    .eventTitle {
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      margin: 0 0 6px;
       text-align: center;
     }
-    .divider {
-      height: 1px;
-      background: rgba(255,255,255,0.10);
-      margin: 16px 0;
+
+    .eventMeta {
+      margin: 0;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
     }
 
+    .countdown {
+      margin-top: 10px;
+      text-align: center;
+      font-size: 18px;
+      letter-spacing: 0.14em;
+      font-variant-numeric: tabular-nums;
+      color: rgba(255,255,255,0.9);
+    }
 
-    /* Step B: Registered state (persisted per-event in localStorage) */
-    .msg.ok { text-align: center; }
-    #regForm.is-registered label,
-    #regForm.is-registered input,
-    #regForm.is-registered #submitBtn { display: none; }
-
-</style>
+    .hidden { display: none !important; }
+  </style>
 </head>
+
 <body>
   <div class="wrap">
-    <div class="brand">THE VOID</div>
-    <p class="sub">Register for access.<br/>Location unlocks at <strong id="revealText">—</strong>.</p>
-    <p class="sub" id="countdown" style="margin-top:6px;"></p>
+    <div class="card">
+      <div class="brand"><span class="dot"></span><span>VOIDPASS</span><span class="dot"></span></div>
+      <h1 id="pageTitle">Invite-only reveal</h1>
+      <p class="sub" id="pageSubtitle">Register your email. At reveal time, you’ll receive the location.</p>
 
-    <div class="panel">
-      <form id="regForm">
-        <label for="fullName">Full name</label>
-        <input id="fullName" name="fullName" autocomplete="name" required />
+      <div class="divider"></div>
 
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="email" required />
+      <div class="eventBox" id="eventBox">
+        <p class="eventTitle" id="eventName">Loading…</p>
+        <p class="eventMeta" id="revealText">Reveal in <span id="revealIn">—</span></p>
+        <div class="countdown" id="countdown">--:--:--</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <form id="regForm" autocomplete="on">
+        <div class="row">
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" name="name" placeholder="Your name" required />
+          </div>
+          <div class="field">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" placeholder="you@example.com" required />
+          </div>
+        </div>
 
         <button class="btn" id="submitBtn" type="submit">Register</button>
 
         <div class="msg ok" id="okMsg">
-  Registered. Check your email for the reveal.
-  <div style="margin-top: 8px; font-size: 0.9em;">
-    <a href="#" id="changeEmailLink">Not you? Change email</a>
-  </div>
-</div>
-        <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
-
-        <div class="divider"></div>
-
-        <div class="note">
-          We collect your name and email only to manage access to this event.<br/>
-          Your details are automatically deleted shortly after the event ends.
+          Registered. Check your email for the reveal.
+          <div style="margin-top: 8px; font-size: 0.9em;">
+            <a href="#" id="changeEmailLink">Not you? Change email</a>
+          </div>
         </div>
-      </form>
-    </div>
 
-    <div class="tiny">Tully Console • Internal build</div>
+        <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
+      </form>
+
+      <div class="divider"></div>
+
+      <p class="sub" style="margin:0; text-align:center;">
+        If you don’t see it, check Spam/Junk.
+      </p>
+    </div>
   </div>
 
-    <script>
-    // ===== CONFIG (Browser) =====
-    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+  <script>
+    // ----------------------------
+    // Config
+    // ----------------------------
+    const SUPABASE_FUNCTION_BASE = "https://eohftkqadwfpaomijhfw.supabase.co/functions/v1";
+    const REGISTER_FN = `${SUPABASE_FUNCTION_BASE}/register`;
 
-    // Edge function endpoint:
-    const REGISTER_URL = `${SUPABASE_URL}/functions/v1/register`;
-
-    // Supabase REST endpoint to fetch the active event
-    // (RLS is disabled in your demo environment, so anon can read.)
-    const ACTIVE_EVENT_URL =
-      `${SUPABASE_URL}/rest/v1/events?status=eq.active&order=created_at.desc&limit=1&select=id,name,reveal_at,timezone`;
+    // ----------------------------
+    // DOM
+    // ----------------------------
+    const eventNameEl = document.getElementById("eventName");
+    const revealInEl = document.getElementById("revealIn");
+    const countdownEl = document.getElementById("countdown");
+    const revealTextEl = document.getElementById("revealText");
 
     const form = document.getElementById("regForm");
+    const submitBtn = document.getElementById("submitBtn");
     const okMsg = document.getElementById("okMsg");
     const badMsg = document.getElementById("badMsg");
-    const submitBtn = document.getElementById("submitBtn");
 
-    const revealTextEl = document.getElementById("revealText");
-    const countdownEl = document.getElementById("countdown");
+    // ----------------------------
+    // State
+    // ----------------------------
+    let currentEventId = null;
+    let countdownTimer = null;
 
-    function show(el) { el.style.display = "block"; }
-    function hide(el) { el.style.display = "none"; }
-
+    // ----------------------------
+    // Helpers
+    // ----------------------------
     function setBusy(isBusy) {
       submitBtn.disabled = isBusy;
       submitBtn.textContent = isBusy ? "Registering…" : "Register";
     }
 
-    function setBad(msg) {
-      badMsg.textContent = msg;
-      show(badMsg);
+    function setOk(message) {
+      badMsg.style.display = "none";
+      okMsg.style.display = "block";
+      if (message) okMsg.firstChild.textContent = message;
     }
 
-
-    // ===== Step B: "You're registered" state (per-event, stored in this browser) =====
-    let currentEventId = null;
+    function setBad(message) {
+      okMsg.style.display = "none";
+      badMsg.style.display = "block";
+      if (message) badMsg.textContent = message;
+    }
 
     function regKeyFor(eventId) {
       return `voidpass_registered_${eventId}`;
     }
 
-    function markRegistered(eventId, email) {
-      try {
-        const payload = {
-          email: email || null,
-          ts: new Date().toISOString()
-        };
-        localStorage.setItem(regKeyFor(eventId), JSON.stringify(payload));
-      } catch (e) {
-        // localStorage might be blocked; ignore
-      }
-    }
-
     function isRegistered(eventId) {
       if (!eventId) return false;
-      try {
-        return !!localStorage.getItem(regKeyFor(eventId));
-      } catch (e) {
-        return false;
-      }
+      const key = regKeyFor(eventId);
+      return !!localStorage.getItem(key);
     }
 
     function applyRegisteredUI() {
-      form.classList.add("is-registered");
-      show(okMsg);
-      hide(badMsg);
-      setBusy(false);
+      form.classList.add("registered");
+      submitBtn.classList.add("hidden");
+      document.getElementById("name").classList.add("hidden");
+      document.getElementById("email").classList.add("hidden");
+      okMsg.style.display = "block";
     }
-    // ===== Reveal time + countdown (event-driven) =====
-    let revealTimer = null;
 
-    function formatRevealTime(dateObj, tz) {
-      // Show day + time in the event timezone (falls back to browser timezone)
-      const opts = {
-        weekday: "short",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true
-      };
-      if (tz) opts.timeZone = tz;
-      return dateObj.toLocaleString(undefined, opts);
+    function applyFormUI() {
+      submitBtn.classList.remove("hidden");
+      document.getElementById("name").classList.remove("hidden");
+      document.getElementById("email").classList.remove("hidden");
     }
 
     function startCountdown(revealAtDate, tz) {
-      if (revealTimer) clearInterval(revealTimer);
+      if (countdownTimer) clearInterval(countdownTimer);
 
       function tick() {
         const now = new Date();
-        const diffMs = revealAtDate - now;
-
-        if (diffMs <= 0) {
-          countdownEl.textContent = "Reveal is happening now — check your email.";
-          clearInterval(revealTimer);
-          revealTimer = null;
+        const ms = revealAtDate.getTime() - now.getTime();
+        if (ms <= 0) {
+          revealInEl.textContent = "now";
+          countdownEl.textContent = "00:00:00";
           return;
         }
-
-        const totalSeconds = Math.floor(diffMs / 1000);
-        const days = Math.floor(totalSeconds / 86400);
-        const hours = Math.floor((totalSeconds % 86400) / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
-
-        const pad2 = (n) => String(n).padStart(2, "0");
-        const hh = pad2(hours);
-        const mm = pad2(minutes);
-        const ss = pad2(seconds);
-
-        countdownEl.textContent = days > 0
-          ? `Location reveals in ${days}d ${hh}h ${mm}m ${ss}s`
-          : `Location reveals in ${hh}h ${mm}m ${ss}s`;
+        const totalSeconds = Math.floor(ms / 1000);
+        const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
+        const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
+        const ss = String(totalSeconds % 60).padStart(2, "0");
+        countdownEl.textContent = `${hh}:${mm}:${ss}`;
+        revealInEl.textContent = "soon";
       }
 
-      // Initial fill
-      revealTextEl.textContent = formatRevealTime(revealAtDate, tz);
       tick();
-      revealTimer = setInterval(tick, 1000);
+      countdownTimer = setInterval(tick, 1000);
     }
 
     async function loadActiveEventAndStartTimer() {
       try {
-        // Show placeholders while loading
-        revealTextEl.textContent = "loading…";
-        countdownEl.textContent = "";
-
-        const res = await fetch(ACTIVE_EVENT_URL, {
-          method: "GET",
+        const r = await fetch("https://eohftkqadwfpaomijhfw.supabase.co/rest/v1/events?select=*&status=eq.active&order=created_at.desc&limit=1", {
           headers: {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
+            apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvaGZ0a3FhZHdmcGFvbWlqaGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1MjQ4OTAsImV4cCI6MjA1MDEwMDg5MH0.7v0-WqXrFFpC-0wI6M1_x8qPvibmMVe-Dt6Nqsh2tPg",
+            Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvaGZ0a3FhZHdmcGFvbWlqaGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1MjQ4OTAsImV4cCI6MjA1MDEwMDg5MH0.7v0-WqXrFFpC-0wI6M1_x8qPvibmMVe-Dt6Nqsh2tPg"
           }
         });
 
-        if (!res.ok) {
-          console.log("[event] status:", res.status);
-          const txt = await res.text();
-          console.log("[event] response:", txt);
-          revealTextEl.textContent = "soon";
+        const data = await r.json();
+        const ev = Array.isArray(data) ? data[0] : null;
+
+        if (!ev) {
+          eventNameEl.textContent = "No active event";
+          revealTextEl.textContent = "Registration is closed";
           countdownEl.textContent = "";
+          form.classList.add("hidden");
           return;
         }
 
-        const rows = await res.json();
-        const ev = rows && rows[0];
-        if (!ev || !ev.reveal_at) {
-          revealTextEl.textContent = "soon";
-          countdownEl.textContent = "";
-          return;
-        }
-
+        eventNameEl.textContent = ev.name || "Untitled event";
 
         // Step B: keep track of the current event id for registration persistence
         currentEventId = ev.id || null;
+
+        // Step 3: auto-expire the local "registered" state 2 hours after reveal time
+        try {
+          const regKey = regKeyFor(currentEventId);
+          const regRaw = localStorage.getItem(regKey);
+
+          if (regRaw) {
+            const revealAtDate = new Date(ev.reveal_at);
+            const expiryMs = revealAtDate.getTime() + 2 * 60 * 60 * 1000; // +2 hours
+            if (!Number.isNaN(expiryMs) && Date.now() > expiryMs) {
+              localStorage.removeItem(regKey);
+            }
+          }
+        } catch (_) {
+          // ignore localStorage/JSON issues
+        }
 
         // If this browser has already registered for this event, show the registered state
         if (isRegistered(currentEventId)) {
           applyRegisteredUI();
         }
+
         const tz = ev.timezone || "Australia/Sydney";
         const revealAtDate = new Date(ev.reveal_at);
 
-        // If parsing fails, don't crash the page
         if (Number.isNaN(revealAtDate.getTime())) {
-          revealTextEl.textContent = "soon";
+          revealInEl.textContent = "soon";
           countdownEl.textContent = "";
           return;
         }
 
         startCountdown(revealAtDate, tz);
       } catch (err) {
-        console.log("[event] load error:", err);
-        revealTextEl.textContent = "soon";
+        console.log("[loadActiveEvent] error:", err);
+        eventNameEl.textContent = "Error loading event";
+        revealTextEl.textContent = "Please refresh";
         countdownEl.textContent = "";
       }
     }
 
-    // Kick off on page load
+    // ----------------------------
+    // Init
+    // ----------------------------
     loadActiveEventAndStartTimer();
 
-    // ===== Registration submit =====
+    // ----------------------------
+    // Register submit
+    // ----------------------------
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      hide(okMsg);
-      hide(badMsg);
+      setOk("");
+      setBad("");
 
-      const fullName = document.getElementById("fullName").value.trim();
-      const email = document.getElementById("email").value.trim();
-
-      if (!fullName || !email) {
-        setBad("Please enter your full name and email.");
+      if (!currentEventId) {
+        setBad("No active event.");
         return;
       }
 
+      const name = document.getElementById("name").value.trim();
+      const email = document.getElementById("email").value.trim();
+
       setBusy(true);
-
       try {
-        const payload = { full_name: fullName, email };
-
-        const res = await fetch(REGISTER_URL, {
+        const payload = { name, email };
+        const r = await fetch(REGISTER_FN, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify(payload)
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
 
-        let data = null;
-        try { data = await res.json(); } catch (_) {}
+        const data = await r.json().catch(() => ({}));
 
-        console.log("[register] status:", res.status);
-        console.log("[register] response:", data);
-
-        if (!res.ok) {
+        if (!r.ok) {
           const msg = (data && (data.error || data.message))
-            ? (data.error || data.message)
-            : `Register failed (${res.status})`;
+            ? String(data.error || data.message)
+            : `Register failed (${r.status})`;
           setBad(msg);
           return;
         }
 
-        // Step B: Persist "registered" state for this event in this browser
-        markRegistered(currentEventId, email);
+        // Persist registration state per event on this device (Step B)
+        try {
+          const key = regKeyFor(currentEventId);
+          localStorage.setItem(key, JSON.stringify({ email, ts: new Date().toISOString() }));
+          localStorage.setItem("void_last_event_id", currentEventId);
+        } catch (_) {}
+
+        setOk("Registered. Check your email for the reveal.");
         applyRegisteredUI();
         form.reset();
       } catch (err) {
@@ -390,30 +452,29 @@
         setBusy(false);
       }
     });
-   <script>
-     
-// --- Change email reset link ---
-const changeEmailLink = document.getElementById("changeEmailLink");
 
-if (changeEmailLink) {
-  changeEmailLink.addEventListener("click", function (e) {
-    e.preventDefault();
+    // --- Change email reset link ---
+    const changeEmailLink = document.getElementById("changeEmailLink");
 
-    // Remove any saved voidpass registration state
-    const keysToRemove = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (!k) continue;
+    if (changeEmailLink) {
+      changeEmailLink.addEventListener("click", function (e) {
+        e.preventDefault();
 
-      if (k.startsWith("voidpass_") && (k.includes("registered") || k.includes("reg"))) {
-        keysToRemove.push(k);
-      }
+        // Remove any saved voidpass registration state
+        const keysToRemove = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (!k) continue;
+
+          if (k.startsWith("voidpass_") && (k.includes("registered") || k.includes("reg"))) {
+            keysToRemove.push(k);
+          }
+        }
+
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+        location.reload();
+      });
     }
-
-    keysToRemove.forEach((k) => localStorage.removeItem(k));
-    location.reload();
-  });
-}
-</script>
+  </script>
 </body>
 </html>
