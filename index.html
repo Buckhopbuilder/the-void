@@ -228,17 +228,35 @@
         return;
       }
 
-      const revealAt = new Date(rows[0].reveal_at);
-      document.getElementById("revealText").textContent =
-        revealAt.toLocaleString();
+      const revealAt = new Date(rows[0].reveal_at).getTime();
+      let voidShown = false;
 
-      setInterval(() => {
-        const diff = Math.floor((revealAt - new Date()) / 1000);
-        if (diff <= 5) showVoid();
-        if (diff <= 0) return;
-        document.getElementById("countdown").textContent =
-          "Location reveals in " + diff + "s";
-      }, 1000);
+setInterval(() => {
+  const now = Date.now();
+  let diff = Math.max(0, Math.floor((revealAt - now) / 1000)); // seconds
+  
+  if (diff <= 5 && !voidShown) {
+  voidShown = true;
+  showVoid();
+}
+  
+  const days = Math.floor(diff / 86400);
+  diff %= 86400;
+
+  const hours = Math.floor(diff / 3600);
+  diff %= 3600;
+
+  const mins = Math.floor(diff / 60);
+  const secs = diff % 60;
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  const el = document.getElementById("countdown");
+if (el) el.textContent =
+    days > 0
+      ? `Location reveals in ${days}d ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`
+      : `Location reveals in ${pad(hours)}h ${pad(mins)}m ${pad(secs)}s`;
+}, 1000);
     }
 
     loadEvent();
