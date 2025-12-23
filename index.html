@@ -245,7 +245,7 @@
     // ----------------------------
     // Config
     // ----------------------------
-    const SUPABASE_FUNCTION_BASE = "https://eohftkqadwfpaomijhfw.supabase.co/functions/v1";
+    const SUPABASE_FUNCTION_BASE = "https://xhitzrnmowqeaerofion.supabase.co/functions/v1";
     const REGISTER_FN = `${SUPABASE_FUNCTION_BASE}/register`;
 
     // ----------------------------
@@ -352,10 +352,10 @@
 
     async function loadActiveEventAndStartTimer() {
       try {
-        const r = await fetch("https://eohftkqadwfpaomijhfw.supabase.co/rest/v1/events?select=*&status=eq.active&order=created_at.desc&limit=1", {
+        const r = await fetch("https://xhitzrnmowqeaerofion.supabase.co/rest/v1/events?select=*&status=eq.active&order=created_at.desc&limit=1", {
           headers: {
-            apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvaGZ0a3FhZHdmcGFvbWlqaGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1MjQ4OTAsImV4cCI6MjA1MDEwMDg5MH0.7v0-WqXrFFpC-0wI6M1_x8qPvibmMVe-Dt6Nqsh2tPg",
-            Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVvaGZ0a3FhZHdmcGFvbWlqaGZ3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQ1MjQ4OTAsImV4cCI6MjA1MDEwMDg5MH0.7v0-WqXrFFpC-0wI6M1_x8qPvibmMVe-Dt6Nqsh2tPg"
+            apikey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk",
+            Authorization: "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk"
           }
         });
 
