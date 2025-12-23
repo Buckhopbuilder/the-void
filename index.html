@@ -4,441 +4,245 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>THE VOID</title>
+
   <style>
     :root {
       --bg: #05060a;
       --panel: rgba(255,255,255,0.06);
-      --panel2: rgba(255,255,255,0.10);
       --text: rgba(255,255,255,0.92);
       --muted: rgba(255,255,255,0.65);
-      --danger: rgba(255,120,120,0.95);
       --ok: rgba(150,255,190,0.95);
+      --bad: rgba(255,120,120,0.95);
     }
+
     * { box-sizing: border-box; }
     html, body { height: 100%; }
+
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(900px 900px at 50% 35%, rgba(120,110,255,0.18), transparent 60%),
+        radial-gradient(700px 700px at 50% 45%, rgba(0,0,0,0.0), rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.9) 100%),
+        var(--bg);
       color: var(--text);
-      background: radial-gradient(900px 900px at 50% 35%, rgba(120,110,255,0.22), transparent 60%),
-                  radial-gradient(700px 700px at 50% 45%, rgba(0,0,0,0.0), rgba(0,0,0,0.65) 55%, rgba(0,0,0,0.9) 100%),
-                  var(--bg);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
     }
+
     .wrap { width: 100%; max-width: 440px; }
+
     .brand {
       text-align: center;
-      margin-bottom: 18px;
+      font-weight: 800;
       letter-spacing: 0.22em;
-      font-weight: 700;
       font-size: 34px;
+      margin-bottom: 12px;
     }
+
     .sub {
       text-align: center;
       color: var(--muted);
-      margin: 0 0 22px 0;
-      line-height: 1.35;
+      margin: 0 0 10px;
+      line-height: 1.4;
     }
+
     .panel {
+      margin-top: 18px;
       background: var(--panel);
-      border: 1px solid rgba(255,255,255,0.10);
+      border: 1px solid rgba(255,255,255,0.12);
       border-radius: 16px;
       padding: 18px;
       backdrop-filter: blur(10px);
-      box-shadow: 0 10px 50px rgba(0,0,0,0.45);
     }
+
     label {
       display: block;
       font-size: 12px;
       color: var(--muted);
       margin: 14px 0 6px;
     }
+
     input {
       width: 100%;
-      padding: 12px 12px;
+      padding: 12px;
       border-radius: 12px;
       border: 1px solid rgba(255,255,255,0.15);
       background: rgba(0,0,0,0.35);
       color: var(--text);
-      outline: none;
     }
-    input:focus {
-      border-color: rgba(160,150,255,0.55);
-      box-shadow: 0 0 0 3px rgba(160,150,255,0.12);
-    }
-    .btn {
+
+    button {
       width: 100%;
       margin-top: 16px;
-      padding: 12px 14px;
-      border: 1px solid rgba(255,255,255,0.18);
-      background: linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.06));
-      color: var(--text);
+      padding: 12px;
       border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.2);
+      background: rgba(255,255,255,0.1);
+      color: var(--text);
       font-weight: 600;
       cursor: pointer;
     }
-    .btn:disabled { opacity: 0.55; cursor: not-allowed; }
-    .note {
-      margin-top: 14px;
-      font-size: 12px;
-      color: var(--muted);
-      line-height: 1.35;
-    }
+
+    button:disabled { opacity: 0.5; }
+
     .msg {
       margin-top: 14px;
       padding: 12px;
       border-radius: 12px;
-      border: 1px solid rgba(255,255,255,0.14);
-      background: var(--panel2);
       display: none;
-      line-height: 1.35;
-    }
-    .msg.ok { border-color: rgba(150,255,190,0.35); color: var(--ok); }
-    .msg.bad { border-color: rgba(255,120,120,0.35); color: var(--danger); }
-    .tiny {
-      margin-top: 10px;
-      font-size: 11px;
-      color: rgba(255,255,255,0.55);
-      text-align: center;
-    }
-    .divider {
-      height: 1px;
-      background: rgba(255,255,255,0.10);
-      margin: 16px 0;
     }
 
-    /* ===== Cinematic final seconds overlay ===== */
-    .void-overlay{
+    .msg.ok { color: var(--ok); border: 1px solid rgba(150,255,190,0.35); }
+    .msg.bad { color: var(--bad); border: 1px solid rgba(255,120,120,0.35); }
+
+    .note {
+      margin-top: 14px;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.4;
+    }
+
+    /* ===== VOID OVERLAY (FINAL EFFECT) ===== */
+
+    .void-overlay {
       position: fixed;
       inset: 0;
       z-index: 9999;
       pointer-events: none;
-      background: #000;
       opacity: 0;
-      clip-path: circle(0% at 50% 50%);
-      transition: opacity 250ms ease;
+      transition: opacity 300ms ease;
     }
-    .void-overlay.is-arming { opacity: 1; }
-    .void-overlay.is-armed{
-      opacity: 1;
-      clip-path: circle(150% at 50% 50%);
-      transition: clip-path 1200ms ease, opacity 250ms ease;
+
+    .void-overlay__wipe {
+      position: absolute;
+      inset: -40vmax;
+      background: #000;
+      border-radius: 50%;
+      transform: scale(0);
+      transition: transform 6200ms ease-in-out;
     }
-    .void-overlay__text{
+
+    .void-overlay__text {
       position: absolute;
       inset: 0;
       display: grid;
       place-items: center;
-      text-align: center;
-      padding: 0 18px;
       font-weight: 800;
       letter-spacing: 0.6px;
-      font-size: clamp(22px, 3.3vw, 38px);
+      font-size: clamp(22px, 3.2vw, 38px);
       color: rgba(255,255,255,0.92);
       opacity: 0;
-      transform: translateY(8px);
-      transition: opacity 700ms ease, transform 700ms ease;
+      transform: translateY(10px);
+      transition: opacity 3000ms ease, transform 3000ms ease;
     }
-    .void-overlay.is-armed .void-overlay__text{
+
+    .void-overlay.is-active {
       opacity: 1;
+    }
+
+    .void-overlay.is-active .void-overlay__wipe {
+      transform: scale(1);
+    }
+
+    .void-overlay.is-active .void-overlay__text {
+      opacity: 0.28;
       transform: translateY(0);
     }
-    .void-overlay__sub{
-      display: block;
-      margin-top: 10px;
-      font-size: clamp(14px, 2.2vw, 18px);
-      font-weight: 600;
-      letter-spacing: 0.4px;
-      color: rgba(255,255,255,0.72);
-    }
-    @media (prefers-reduced-motion: reduce){
-      .void-overlay, .void-overlay__text { transition: none !important; }
-      .void-overlay.is-armed { clip-path: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .void-overlay__wipe,
+      .void-overlay__text {
+        transition: none;
+      }
     }
   </style>
 </head>
+
 <body>
+
   <div class="wrap">
     <div class="brand">THE VOID</div>
-    <p class="sub">Register for access.<br/>Location unlocks at <strong id="revealText">—</strong>.</p>
-    <p class="sub" id="countdown" style="margin-top:6px;"></p>
+
+    <p class="sub">
+      Register for access.<br>
+      Location unlocks at <strong id="revealText">—</strong>
+    </p>
+
+    <p class="sub" id="countdown"></p>
 
     <div class="panel">
       <form id="regForm">
-        <label for="fullName">Full name</label>
-        <input id="fullName" name="fullName" autocomplete="name" required />
+        <label>Full name</label>
+        <input id="fullName" required>
 
-        <label for="email">Email</label>
-        <input id="email" name="email" type="email" autocomplete="email" required />
+        <label>Email</label>
+        <input id="email" type="email" required>
 
-        <button class="btn" id="submitBtn" type="submit">Register</button>
+        <button id="submitBtn">Register</button>
 
-        <div class="msg ok" id="okMsg">Registered. (Email confirmation is not implemented yet.)</div>
-        <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
-
-        <div class="divider"></div>
+        <div class="msg ok" id="okMsg">Registered. Check your email.</div>
+        <div class="msg bad" id="badMsg"></div>
 
         <div class="note">
-          We collect your name and email only to manage access to this event.<br/>
-          Your details are automatically deleted shortly after the event ends.
+          We only collect your name and email to manage access.<br>
+          All data is automatically deleted after the event.
         </div>
       </form>
     </div>
-
-    <div class="tiny">Tully Console • Internal build</div>
   </div>
 
-  <!-- Cinematic final seconds overlay -->
-  <div id="voidOverlay" class="void-overlay" aria-hidden="true">
-    <div class="void-overlay__text">
-      The void has taken…
-      <span class="void-overlay__sub">It remains.</span>
-    </div>
+  <!-- VOID OVERLAY -->
+  <div id="voidOverlay" class="void-overlay">
+    <div class="void-overlay__wipe"></div>
+    <div class="void-overlay__text">The void has taken…</div>
   </div>
 
   <script>
-    // ===== CONFIG (Browser) =====
     const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
 
-    // Edge function endpoint:
-    const REGISTER_URL = `${SUPABASE_URL}/functions/v1/register`;
+    const REGISTER_URL = SUPABASE_URL + "/functions/v1/register";
+    const EVENT_URL = SUPABASE_URL +
+      "/rest/v1/events?status=eq.active&order=created_at.desc&limit=1";
 
-    // Supabase REST endpoint to fetch the active event
-    // (RLS is disabled in your demo environment, so anon can read.)
-    const ACTIVE_EVENT_URL =
-      `${SUPABASE_URL}/rest/v1/events?status=eq.active&order=created_at.desc&limit=1&select=id,name,reveal_at,timezone`;
+    const overlay = document.getElementById("voidOverlay");
 
-    const form = document.getElementById("regForm");
-    const okMsg = document.getElementById("okMsg");
-    const badMsg = document.getElementById("badMsg");
-    const submitBtn = document.getElementById("submitBtn");
-
-    const revealTextEl = document.getElementById("revealText");
-    const countdownEl = document.getElementById("countdown");
-
-    function show(el) { el.style.display = "block"; }
-    function hide(el) { el.style.display = "none"; }
-
-    function setBusy(isBusy) {
-      submitBtn.disabled = isBusy;
-      submitBtn.textContent = isBusy ? "Registering…" : "Register";
+    function showVoid() {
+      overlay.classList.add("is-active");
     }
 
-    function setBad(msg) {
-      badMsg.textContent = msg;
-      show(badMsg);
-    }
-
-    // ===== Cinematic overlay state (latched per event) =====
-    const overlayEl = document.getElementById("voidOverlay");
-    const LS_LAST_ACTIVE_EVENT_ID = "void_last_event_id";
-    const LS_LATCHED_FOR_EVENT_ID = "void_overlay_latched_for_event_id";
-    let currentActiveEventId = null;
-
-    function armVoidOverlay() {
-      if (!overlayEl) return;
-      if (!overlayEl.classList.contains("is-arming")) overlayEl.classList.add("is-arming");
-      requestAnimationFrame(() => overlayEl.classList.add("is-armed"));
-    }
-
-    function disarmVoidOverlay() {
-      if (!overlayEl) return;
-      overlayEl.classList.remove("is-armed", "is-arming");
-    }
-
-    function latchOverlayForEvent(eventId) {
-      if (!eventId) return;
-      localStorage.setItem(LS_LATCHED_FOR_EVENT_ID, eventId);
-    }
-
-    function isOverlayLatchedForEvent(eventId) {
-      return localStorage.getItem(LS_LATCHED_FOR_EVENT_ID) === eventId;
-    }
-
-    // ===== Reveal time + countdown (event-driven) =====
-    let revealTimer = null;
-
-    function formatRevealTime(dateObj, tz) {
-      // Show day + time in the event timezone (falls back to browser timezone)
-      const opts = {
-        weekday: "short",
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true
-      };
-      if (tz) opts.timeZone = tz;
-      return dateObj.toLocaleString(undefined, opts);
-    }
-
-    function startCountdown(revealAtDate, tz) {
-      if (revealTimer) clearInterval(revealTimer);
-
-      function tick() {
-        const now = new Date();
-        const diffMs = revealAtDate - now;
-
-        if (diffMs <= 0) {
-          countdownEl.textContent = "Reveal is happening now — check your email.";
-          if (currentActiveEventId) latchOverlayForEvent(currentActiveEventId);
-          armVoidOverlay(); // keep it on
-          clearInterval(revealTimer);
-          revealTimer = null;
-          return;
+    async function loadEvent() {
+      const res = await fetch(EVENT_URL, {
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: "Bearer " + SUPABASE_ANON_KEY
         }
+      });
 
-        const totalSeconds = Math.floor(diffMs / 1000);
-
-        // Arm cinematic in the last 5 seconds
-        if (totalSeconds <= 5) {
-          armVoidOverlay();
-        }
-
-        const days = Math.floor(totalSeconds / 86400);
-        const hours = Math.floor((totalSeconds % 86400) / 3600);
-        const minutes = Math.floor((totalSeconds % 3600) / 60);
-        const seconds = totalSeconds % 60;
-
-        const pad2 = (n) => String(n).padStart(2, "0");
-        const hh = pad2(hours);
-        const mm = pad2(minutes);
-        const ss = pad2(seconds);
-
-        countdownEl.textContent = days > 0
-          ? `Location reveals in ${days}d ${hh}h ${mm}m ${ss}s`
-          : `Location reveals in ${hh}h ${mm}m ${ss}s`;
-      }
-
-      // Initial fill
-      revealTextEl.textContent = formatRevealTime(revealAtDate, tz);
-
-      // If we already latched for this event earlier, keep overlay on
-      if (currentActiveEventId && isOverlayLatchedForEvent(currentActiveEventId)) {
-        armVoidOverlay();
-      }
-
-      tick();
-      revealTimer = setInterval(tick, 1000);
-    }
-
-    async function loadActiveEventAndStartTimer() {
-      try {
-        // Show placeholders while loading
-        revealTextEl.textContent = "loading…";
-        countdownEl.textContent = "";
-
-        const res = await fetch(ACTIVE_EVENT_URL, {
-          method: "GET",
-          headers: {
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-          }
-        });
-
-        if (!res.ok) {
-          console.log("[event] status:", res.status);
-          const txt = await res.text();
-          console.log("[event] response:", txt);
-          revealTextEl.textContent = "soon";
-          countdownEl.textContent = "";
-          return;
-        }
-
-        const rows = await res.json();
-        const ev = rows && rows[0];
-        if (!ev || !ev.reveal_at) {
-          revealTextEl.textContent = "soon";
-          countdownEl.textContent = "";
-          return;
-        }
-
-        // Reset overlay latch if the active event changed
-        currentActiveEventId = ev.id || null;
-        const lastId = localStorage.getItem(LS_LAST_ACTIVE_EVENT_ID);
-        if (currentActiveEventId && currentActiveEventId !== lastId) {
-          localStorage.setItem(LS_LAST_ACTIVE_EVENT_ID, currentActiveEventId);
-          // New active event => overlay should NOT remain from previous event
-          disarmVoidOverlay();
-          // Note: we keep LS_LATCHED_FOR_EVENT_ID as the eventId it latched for.
-          // If it's a different event, isOverlayLatchedForEvent(newId) will be false anyway.
-        }
-
-        const tz = ev.timezone || "Australia/Sydney";
-        const revealAtDate = new Date(ev.reveal_at);
-
-        // If parsing fails, don't crash the page
-        if (Number.isNaN(revealAtDate.getTime())) {
-          revealTextEl.textContent = "soon";
-          countdownEl.textContent = "";
-          return;
-        }
-
-        startCountdown(revealAtDate, tz);
-      } catch (err) {
-        console.log("[event] load error:", err);
-        revealTextEl.textContent = "soon";
-        countdownEl.textContent = "";
-      }
-    }
-
-    // Kick off on page load
-    loadActiveEventAndStartTimer();
-
-    // ===== Registration submit =====
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      hide(okMsg);
-      hide(badMsg);
-
-      const fullName = document.getElementById("fullName").value.trim();
-      const email = document.getElementById("email").value.trim();
-
-      if (!fullName || !email) {
-        setBad("Please enter your full name and email.");
+      const rows = await res.json();
+      if (!rows.length) {
+        showVoid();
         return;
       }
 
-      setBusy(true);
+      const revealAt = new Date(rows[0].reveal_at);
+      document.getElementById("revealText").textContent =
+        revealAt.toLocaleString();
 
-      try {
-        const payload = { full_name: fullName, email };
+      setInterval(() => {
+        const diff = Math.floor((revealAt - new Date()) / 1000);
+        if (diff <= 5) showVoid();
+        if (diff <= 0) return;
+        document.getElementById("countdown").textContent =
+          "Location reveals in " + diff + "s";
+      }, 1000);
+    }
 
-        const res = await fetch(REGISTER_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": SUPABASE_ANON_KEY,
-            "Authorization": `Bearer ${SUPABASE_ANON_KEY}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        let data = null;
-        try { data = await res.json(); } catch (_) {}
-
-        console.log("[register] status:", res.status);
-        console.log("[register] response:", data);
-
-        if (!res.ok) {
-          const msg = (data && (data.error || data.message))
-            ? (data.error || data.message)
-            : `Register failed (${res.status})`;
-          setBad(msg);
-          return;
-        }
-
-        show(okMsg);
-        form.reset();
-      } catch (err) {
-        console.log("[register] network error:", err);
-        setBad("Network error calling register function.");
-      } finally {
-        setBusy(false);
-      }
-    });
+    loadEvent();
   </script>
+
 </body>
 </html>
