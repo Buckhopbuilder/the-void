@@ -391,15 +391,25 @@
       }
     });
       // --- Change email reset link ---
-const changeEmailLink = document.getElementById("changeEmailLink");
+changeEmailLink.addEventListener("click", function (e) {
+  e.preventDefault();
 
-if (changeEmailLink) {
-  changeEmailLink.addEventListener("click", function (e) {
-    e.preventDefault();
-    localStorage.removeItem("voidpass_registered_event");
-    location.reload();
-  });
-}
+  // Remove any saved "registered" state we might have stored (per-event or global)
+  const keysToRemove = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k) continue;
+
+    // wipe any voidpass registration flags (covers old + new naming)
+    if (k.startsWith("voidpass_") && (k.includes("registered") || k.includes("reg"))) {
+      keysToRemove.push(k);
+    }
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+
+  // Reload so the page re-runs from a clean state
+  location.reload();
+});
 </script>
 </body>
 </html>
