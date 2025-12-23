@@ -390,7 +390,17 @@
         setBusy(false);
       }
     });
-  </script>
+      // --- Change email reset link ---
+const changeEmailLink = document.getElementById("changeEmailLink");
+
+if (changeEmailLink) {
+  changeEmailLink.addEventListener("click", function (e) {
+    e.preventDefault();
+    localStorage.removeItem("voidpass_registered_event");
+    location.reload();
+  });
+}
+</script>
 </body>
 </html>
 
