@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VoidPass Admin</title>
+
+  <style>
+    :root{
+      --bg:#070912;
+      --card:rgba(255,255,255,.06);
+      --card2:rgba(255,255,255,.08);
+      --text:rgba(255,255,255,.92);
+      --muted:rgba(255,255,255,.65);
+      --line:rgba(255,255,255,.12);
+      --good:#6ee7b7;
+      --bad:#fca5a5;
+      --warn:#fde68a;
+      --btn:rgba(255,255,255,.10);
+      --btn2:rgba(255,255,255,.16);
+      --shadow: 0 12px 40px rgba(0,0,0,.45);
+      --radius:20px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--sans);
+      color:var(--text);
+      background:
+        radial-gradient(1000px 500px at 20% 10%, rgba(255,120,120,.14), transparent 60%),
+        radial-gradient(900px 550px at 85% 70%, rgba(120,160,255,.14), transparent 60%),
+        radial-gradient(800px 500px at 55% 40%, rgba(140,255,210,.08), transparent 55%),
+        var(--bg);
+      min-height:100vh;
+      display:flex;
+      align-items:flex-start;
+      justify-content:center;
+      padding:36px 16px;
+    }
+    .wrap{
+      width: min(980px, 100%);
+    }
+    .header{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      letter-spacing:.18em;
+      text-transform:uppercase;
+      font-weight:700;
+      opacity:.9;
+    }
+    .dot{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.75)}
+    .pill{
+      font-family:var(--mono);
+      font-size:12px;
+      padding:6px 10px;
+      border:1px solid var(--line);
+      border-radius:999px;
+      background:rgba(0,0,0,.18);
+      color:var(--muted);
+      max-width: 65%;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+      margin-top:14px;
+    }
+    .card .inner{ padding:18px; }
+    .row{ display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    input{
+      width: min(320px, 100%);
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.20);
+      color:var(--text);
+      outline:none;
+    }
+    input::placeholder{ color: rgba(255,255,255,.45); }
+    button{
+      padding:12px 14px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:var(--btn);
+      color:var(--text);
+      cursor:pointer;
+    }
+    button:hover{ background:var(--btn2); }
+    button:disabled{ opacity:.55; cursor:not-allowed; }
+    .msg{
+      margin-top:12px;
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,.18);
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.35;
+      white-space:pre-wrap;
+    }
+    .msg.good{ border-color: rgba(110,231,183,.35); color: rgba(220,255,240,.92); }
+    .msg.bad{ border-color: rgba(252,165,165,.35); color: rgba(255,230,230,.92); }
+    .msg.warn{ border-color: rgba(253,230,138,.35); color: rgba(255,247,210,.92); }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:12px;
+      margin-top:12px;
+    }
+    @media (max-width: 720px){
+      .grid{ grid-template-columns:1fr; }
+      .pill{ max-width:100%; }
+    }
+    .panel{
+      background:var(--card2);
+      border:1px solid var(--line);
+      border-radius:16px;
+      padding:14px;
+    }
+    .k{ color:var(--muted); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+    .v{ font-size:18px; margin-top:6px; font-weight:700; }
+    .v.mono{ font-family:var(--mono); font-weight:600; font-size:14px; opacity:.95; }
+    .divider{ height:1px; background:var(--line); margin:14px 0; }
+    .small{ color:var(--muted); font-size:12px; line-height:1.4; }
+    .right{ margin-left:auto; display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .link{
+      color: rgba(255,255,255,.75);
+      text-decoration: none;
+      border-bottom: 1px dashed rgba(255,255,255,.25);
+    }
+    .link:hover{ opacity:.9; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="header">
+      <div class="brand">
+        <span class="dot"></span>
+        <span>VoidPass Admin</span>
+        <span class="dot"></span>
+      </div>
+      <div class="right">
+        <div id="sessionPill" class="pill">Not signed in</div>
+        <button id="btnRefresh" onclick="refreshDashboard()" disabled>Refresh</button>
+        <button id="btnLogout" onclick="doLogout()" disabled>Logout</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="inner">
+        <div class="row">
+          <input id="email" type="email" placeholder="Email" autocomplete="username" />
+          <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+          <button id="btnLogin" onclick="doLogin()">Login</button>
+        </div>
+
+        <div id="status" class="msg">Tip: This page only works for allowlisted organizer/admin emails.</div>
+
+        <div class="divider"></div>
+
+        <div class="grid">
+          <div class="panel">
+            <div class="k">Active Event</div>
+            <div id="evName" class="v">—</div>
+            <div id="evMeta" class="v mono">—</div>
+          </div>
+
+          <div class="panel">
+            <div class="k">Registrations</div>
+            <div id="regTotals" class="v">—</div>
+            <div id="regMeta" class="v mono">—</div>
+          </div>
+
+          <div class="panel">
+            <div class="k">Reveal Emails</div>
+            <div id="revealTotals" class="v">—</div>
+            <div id="revealMeta" class="v mono">—</div>
+          </div>
+
+          <div class="panel">
+            <div class="k">Notes</div>
+            <div class="small">
+              If you see “Organizer access required”, you are signed in but not allowlisted.<br/>
+              Allowlist lives in <span style="font-family:var(--mono);">organizer_allowlist</span> table.
+            </div>
+            <div class="small" style="margin-top:10px;">
+              Public site stays at <a class="link" href="./index.html">index.html</a>.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Supabase JS (must be loaded before our script) -->
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <script>
+    // ====== CONFIG ======
+    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+
+    // ====== CLIENT ======
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ====== UI HELPERS ======
+    const el = (id) => document.getElementById(id);
+
+    function setStatus(text, kind = "msg") {
+      const box = el("status");
+      box.className = "msg";
+      if (kind === "good") box.classList.add("good");
+      if (kind === "bad") box.classList.add("bad");
+      if (kind === "warn") box.classList.add("warn");
+      box.textContent = text;
+    }
+
+    function setSignedInUI(email) {
+      el("sessionPill").textContent = email ? `Signed in: ${email}` : "Not signed in";
+      el("btnLogout").disabled = !email;
+      el("btnRefresh").disabled = !email;
+    }
+
+    function setDashboardEmpty() {
+      el("evName").textContent = "—";
+      el("evMeta").textContent = "—";
+      el("regTotals").textContent = "—";
+      el("regMeta").textContent = "—";
+      el("revealTotals").textContent = "—";
+      el("revealMeta").textContent = "—";
+    }
+
+    // ====== AUTH ======
+    async function doLogin() {
+      const email = el("email").value.trim();
+      const password = el("password").value;
+
+      if (!email || !password) {
+        setStatus("Enter email + password.", "warn");
+        return;
+      }
+
+      el("btnLogin").disabled = true;
+      setStatus("Signing in...", "msg");
+
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+      el("btnLogin").disabled = false;
+
+      if (error) {
+        setStatus(`Login failed:\n${error.message}`, "bad");
+        return;
+      }
+
+      setStatus("Signed in. Loading dashboard…", "good");
+      setSignedInUI(data?.user?.email || email);
+      await refreshDashboard();
+    }
+
+    async function doLogout() {
+      await supabase.auth.signOut();
+      setSignedInUI(null);
+      setDashboardEmpty();
+      setStatus("Logged out.", "msg");
+    }
+
+    supabase.auth.onAuthStateChange(async (_event, session) => {
+      const email = session?.user?.email || null;
+      setSignedInUI(email);
+
+      if (email) {
+        setStatus("Session detected. Loading dashboard…", "msg");
+        await refreshDashboard();
+      } else {
+        setStatus("Tip: This page only works for allowlisted organizer/admin emails.", "msg");
+        setDashboardEmpty();
+      }
+    });
+
+    // ====== DASHBOARD RPC ======
+    async function refreshDashboard() {
+      setStatus("Fetching admin dashboard…", "msg");
+
+      const { data, error } = await supabase.rpc("admin_dashboard");
+
+      if (error) {
+        // Common: "Organizer access required"
+        setDashboardEmpty();
+        setStatus(`Admin dashboard error:\n${error.message}`, "bad");
+        return;
+      }
+
+      if (!data || data.has_active_event !== true) {
+        setDashboardEmpty();
+        setStatus("No active event.", "warn");
+        el("evName").textContent = "No active event";
+        el("evMeta").textContent = "—";
+        return;
+      }
+
+      const a = data.active_event || {};
+      const logs = data.reveal_email_logs || {};
+
+      el("evName").textContent = a.event_name || "(unnamed)";
+      el("evMeta").textContent =
+        `status=${a.status || "?"} | reveal_at=${a.reveal_at || "?"} | end_at=${a.end_at || "?"} | tz=${a.timezone || "?"}`;
+
+      el("regTotals").textContent = `${a.registrations_total ?? 0} total`;
+      el("regMeta").textContent =
+        `revealed=${a.registrations_revealed ?? 0} | pending=${a.registrations_pending ?? 0}`;
+
+      const total = logs.reveal_logs_total ?? 0;
+      const ok = logs.reveal_sent_ok ?? 0;
+      const failed = logs.reveal_sent_failed ?? 0;
+      const inflight = logs.reveal_claimed_inflight ?? 0;
+
+      el("revealTotals").textContent = `${total} logs`;
+      el("revealMeta").textContent =
+        `ok=${ok} | failed=${failed} | inflight=${inflight}`;
+
+      setStatus("Dashboard loaded.", "good");
+    }
+
+    // Initial UI
+    setSignedInUI(null);
+    setDashboardEmpty();
+  </script>
+</body>
+</html>
