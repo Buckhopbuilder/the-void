@@ -210,138 +210,14 @@
     </div>
   </div>
 
-  <!-- Supabase JS (must be loaded before our script) -->
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+ <!-- Supabase JS (must be loaded before our script) -->
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
 
-  <script>
-    // ====== CONFIG ======
-    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
-
-    // ====== CLIENT ======
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-    // ====== UI HELPERS ======
-    const el = (id) => document.getElementById(id);
-
-    function setStatus(text, kind = "msg") {
-      const box = el("status");
-      box.className = "msg";
-      if (kind === "good") box.classList.add("good");
-      if (kind === "bad") box.classList.add("bad");
-      if (kind === "warn") box.classList.add("warn");
-      box.textContent = text;
-    }
-
-    function setSignedInUI(email) {
-      el("sessionPill").textContent = email ? `Signed in: ${email}` : "Not signed in";
-      el("btnLogout").disabled = !email;
-      el("btnRefresh").disabled = !email;
-    }
-
-    function setDashboardEmpty() {
-      el("evName").textContent = "—";
-      el("evMeta").textContent = "—";
-      el("regTotals").textContent = "—";
-      el("regMeta").textContent = "—";
-      el("revealTotals").textContent = "—";
-      el("revealMeta").textContent = "—";
-    }
-
-    // ====== AUTH ======
-    async function doLogin() {
-      const email = el("email").value.trim();
-      const password = el("password").value;
-
-      if (!email || !password) {
-        setStatus("Enter email + password.", "warn");
-        return;
-      }
-
-      el("btnLogin").disabled = true;
-      setStatus("Signing in...", "msg");
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-      el("btnLogin").disabled = false;
-
-      if (error) {
-        setStatus(`Login failed:\n${error.message}`, "bad");
-        return;
-      }
-
-      setStatus("Signed in. Loading dashboard…", "good");
-      setSignedInUI(data?.user?.email || email);
-      await refreshDashboard();
-    }
-
-    async function doLogout() {
-      await supabase.auth.signOut();
-      setSignedInUI(null);
-      setDashboardEmpty();
-      setStatus("Logged out.", "msg");
-    }
-
-    supabase.auth.onAuthStateChange(async (_event, session) => {
-      const email = session?.user?.email || null;
-      setSignedInUI(email);
-
-      if (email) {
-        setStatus("Session detected. Loading dashboard…", "msg");
-        await refreshDashboard();
-      } else {
-        setStatus("Tip: This page only works for allowlisted organizer/admin emails.", "msg");
-        setDashboardEmpty();
-      }
-    });
-
-    // ====== DASHBOARD RPC ======
-    async function refreshDashboard() {
-      setStatus("Fetching admin dashboard…", "msg");
-
-      const { data, error } = await supabase.rpc("admin_dashboard");
-
-      if (error) {
-        // Common: "Organizer access required"
-        setDashboardEmpty();
-        setStatus(`Admin dashboard error:\n${error.message}`, "bad");
-        return;
-      }
-
-      if (!data || data.has_active_event !== true) {
-        setDashboardEmpty();
-        setStatus("No active event.", "warn");
-        el("evName").textContent = "No active event";
-        el("evMeta").textContent = "—";
-        return;
-      }
-
-      const a = data.active_event || {};
-      const logs = data.reveal_email_logs || {};
-
-      el("evName").textContent = a.event_name || "(unnamed)";
-      el("evMeta").textContent =
-        `status=${a.status || "?"} | reveal_at=${a.reveal_at || "?"} | end_at=${a.end_at || "?"} | tz=${a.timezone || "?"}`;
-
-      el("regTotals").textContent = `${a.registrations_total ?? 0} total`;
-      el("regMeta").textContent =
-        `revealed=${a.registrations_revealed ?? 0} | pending=${a.registrations_pending ?? 0}`;
-
-      const total = logs.reveal_logs_total ?? 0;
-      const ok = logs.reveal_sent_ok ?? 0;
-      const failed = logs.reveal_sent_failed ?? 0;
-      const inflight = logs.reveal_claimed_inflight ?? 0;
-
-      el("revealTotals").textContent = `${total} logs`;
-      el("revealMeta").textContent =
-        `ok=${ok} | failed=${failed} | inflight=${inflight}`;
-
-      setStatus("Dashboard loaded.", "good");
-    }
-
-    // Initial UI
-    setSignedInUI(null);
-    setDashboardEmpty();
-  </script>
+<script>
+  // ====== CONFIG ======
+  const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOi...";
+  ...
+</script>
 </body>
 </html>
