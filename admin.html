@@ -218,7 +218,7 @@
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
 
     // ====== CLIENT ======
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     // ====== UI HELPERS ======
     const el = (id) => document.getElementById(id);
@@ -275,13 +275,13 @@
     }
 
     async function doLogout() {
-      await supabase.auth.signOut();
+      await sb.auth.signOut();
       setSignedInUI(null);
       setDashboardEmpty();
       setStatus("Logged out.", "msg");
     }
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    b.auth.onAuthStateChange(async (_event, session) => {
       const email = session?.user?.email || null;
       setSignedInUI(email);
 
@@ -298,7 +298,7 @@
     async function refreshDashboard() {
       setStatus("Fetching admin dashboard…", "msg");
 
-      const { data, error } = await supabase.rpc("admin_dashboard");
+      const { data, error } = await sb.rpc("admin_dashboard");
 
       if (error) {
         setDashboardEmpty();
