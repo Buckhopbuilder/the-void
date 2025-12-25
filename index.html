@@ -387,7 +387,7 @@
           const regRaw = localStorage.getItem(regKey);
 
           if (regRaw) {
-            const revealAtDate = new Date(String(ev.reveal_at).replace(" ", "T"));
+            const revealAtDate = new Date(ev.reveal_at);
             const expiryMs = revealAtDate.getTime() + 2 * 60 * 60 * 1000;
             if (!Number.isNaN(expiryMs) && Date.now() > expiryMs) {
               localStorage.removeItem(regKey);
@@ -400,7 +400,7 @@
         }
 
         const tz = ev.timezone || "Australia/Sydney";
-        const revealAtDate = new Date(String(ev.reveal_at).replace(" ", "T"));
+        const revealAtDate = new Date(ev.reveal_at);
 
         if (Number.isNaN(revealAtDate.getTime())) {
           revealInEl.textContent = "soon";
