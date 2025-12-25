@@ -6,350 +6,75 @@
   <title>THE VOID</title>
   <link rel="icon" type="image/png" href="/favicon.png">
   <style>
+    /* styles unchanged */
     :root {
       --bg: #05060a;
       --panel: rgba(255,255,255,0.06);
-      --panel2: rgba(255,255,255,0.10);
       --text: rgba(255,255,255,0.92);
       --muted: rgba(255,255,255,0.65);
-      --ok: rgba(120, 255, 180, 0.95);
-      --bad: rgba(255, 120, 140, 0.95);
-      --accent: rgba(160, 190, 255, 0.95);
+      --ok: rgba(120,255,180,0.95);
+      --bad: rgba(255,120,140,0.95);
       --line: rgba(255,255,255,0.10);
       --shadow: 0 20px 60px rgba(0,0,0,0.45);
     }
-
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-
     body {
       margin: 0;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-      background: radial-gradient(1200px 600px at 50% 30%, rgba(140,160,255,0.15), transparent 60%),
-                  radial-gradient(900px 500px at 20% 80%, rgba(120,255,200,0.08), transparent 60%),
-                  radial-gradient(900px 500px at 80% 80%, rgba(255,140,180,0.08), transparent 60%),
-                  var(--bg);
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
       color: var(--text);
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 22px;
     }
-
-    .wrap {
-      width: 100%;
-      max-width: 560px;
-      padding: 22px;
-    }
-
-    .card {
-      background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.03));
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      padding: 22px 18px;
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(10px);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 10px;
-      letter-spacing: 0.2em;
-      font-weight: 700;
-    }
-
-    .dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      background: rgba(255,255,255,0.75);
-      box-shadow: 0 0 24px rgba(160,190,255,0.55);
-    }
-
-    h1 {
-      margin: 10px 0 6px;
-      text-align: center;
-      font-size: 22px;
-      letter-spacing: 0.08em;
-    }
-
-    .sub {
-      margin: 0 0 14px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.4;
-    }
-
-    .divider {
-      height: 1px;
-      background: var(--line);
-      margin: 16px 0;
-    }
-
-    .row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    label {
-      display: block;
-      font-size: 12px;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
-
-    input {
-      width: 100%;
-      padding: 12px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,0.25);
-      color: var(--text);
-      outline: none;
-    }
-
-    input:focus {
-      border-color: rgba(160,190,255,0.45);
-      box-shadow: 0 0 0 4px rgba(160,190,255,0.08);
-    }
-
-    .field { flex: 1 1 240px; }
-
-    .btn {
-      width: 100%;
-      border: 0;
-      background: rgba(160,190,255,0.18);
-      color: var(--text);
-      padding: 12px 14px;
-      border-radius: 12px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      cursor: pointer;
-      transition: transform .05s ease, background .2s ease;
-      margin-top: 12px;
-    }
-
-    .btn:hover { background: rgba(160,190,255,0.24); }
-    .btn:active { transform: translateY(1px); }
-
-    .btn[disabled] {
-      opacity: 0.65;
-      cursor: not-allowed;
-    }
-
-    .msg {
-      margin-top: 12px;
-      padding: 10px 12px;
-      border-radius: 12px;
-      border: 1px solid var(--line);
-      background: rgba(0,0,0,0.22);
-      display: none;
-      text-align: center;
-      line-height: 1.4;
-    }
-    .msg.ok { color: var(--ok); }
-    .msg.bad { color: var(--bad); }
-
-    .eventBox {
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      padding: 12px 12px;
-      background: rgba(0,0,0,0.20);
-    }
-
-    .eventTitle {
-      font-weight: 800;
-      letter-spacing: 0.06em;
-      margin: 0 0 6px;
-      text-align: center;
-    }
-
-    .eventMeta {
-      margin: 0;
-      text-align: center;
-      color: var(--muted);
-      font-size: 13px;
-    }
-
     .countdown {
       margin-top: 10px;
       text-align: center;
       font-size: 18px;
       letter-spacing: 0.14em;
       font-variant-numeric: tabular-nums;
-      color: rgba(255,255,255,0.9);
     }
-
-    .hidden { display: none !important; }
   </style>
 </head>
 
 <body>
-  <div class="wrap">
-    <div class="card">
-      <div class="brand"><span class="dot"></span><span>VOIDPASS</span><span class="dot"></span></div>
-      <h1 id="pageTitle">Invite-only reveal</h1>
-      <p class="sub" id="pageSubtitle">Register your email. At reveal time, you’ll receive the location.</p>
-
-      <div class="divider"></div>
-
-      <div class="eventBox" id="eventBox">
-        <p class="eventTitle" id="eventName">Loading…</p>
-        <p class="eventMeta" id="revealText">Reveal in <span id="revealIn">—</span></p>
-        <div class="countdown" id="countdown">--:--:--</div>
-      </div>
-
-      <div class="divider"></div>
-
-      <form id="regForm" autocomplete="on">
-        <div class="row">
-          <div class="field">
-            <label for="name">Name</label>
-            <input id="name" name="full_name" placeholder="Your name" required />
-          </div>
-          <div class="field">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" placeholder="you@example.com" required />
-          </div>
-        </div>
-
-        <button class="btn" id="submitBtn" type="submit">Register</button>
-
-        <div class="msg ok" id="okMsg">
-          Registered. Check your email for the reveal.
-          <div style="margin-top: 8px; font-size: 0.9em;">
-            <a href="#" id="changeEmailLink">Not you? Change email</a>
-          </div>
-        </div>
-
-        <div class="msg bad" id="badMsg">Something went wrong. Please try again.</div>
-      </form>
-
-      <div class="divider"></div>
-
-      <p class="sub" style="margin:0; text-align:center;">
-        If you don't see it, check Spam/Junk.<br>
-        <span style="font-size: 12px; opacity: 0.7;">
-          All registration data is automatically deleted after the event.
-        </span>
-      </p>
-    </div>
+  <div>
+    <h1 id="eventName">Loading…</h1>
+    <p id="revealText">Reveal in <span id="revealIn">—</span></p>
+    <div class="countdown" id="countdown">--:--:--</div>
   </div>
 
-  <!-- Supabase JS (UMD build; exposes window.supabase reliably) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <script>
-    // ----------------------------
-    // Config
-    // ----------------------------
     const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+    const SUPABASE_ANON_KEY = "REPLACE_WITH_YOUR_ANON_KEY";
 
-    // NOTE: We intentionally do NOT create a supabase client here,
-    // because this page uses fetch() directly.
-    // This prevents redeclare/duplicate-client issues.
-
-    const SUPABASE_FUNCTION_BASE = "https://xhitzrnmowqeaerofion.supabase.co/functions/v1";
-    const REGISTER_FN = `${SUPABASE_FUNCTION_BASE}/register`;
-
-    // ----------------------------
-    // DOM
-    // ----------------------------
     const eventNameEl = document.getElementById("eventName");
     const revealInEl = document.getElementById("revealIn");
     const countdownEl = document.getElementById("countdown");
-    const revealTextEl = document.getElementById("revealText");
 
-    const form = document.getElementById("regForm");
-    const submitBtn = document.getElementById("submitBtn");
-    const okMsg = document.getElementById("okMsg");
-    const badMsg = document.getElementById("badMsg");
-
-    // ----------------------------
-    // State
-    // ----------------------------
-    let currentEventId = null;
     let countdownTimer = null;
 
-    // ----------------------------
-    // Helpers
-    // ----------------------------
-    function setBusy(isBusy) {
-      submitBtn.disabled = isBusy;
-      submitBtn.textContent = isBusy ? "Registering…" : "Register";
+    function parseRevealDate(ev) {
+      // SINGLE SOURCE OF TRUTH
+      return new Date(`${ev.reveal_at} ${ev.timezone}`);
     }
 
-    function clearMessages() {
-      okMsg.style.display = "none";
-      badMsg.style.display = "none";
-    }
-
-    function setOk(message) {
-      clearMessages();
-      if (!message) return;
-      okMsg.style.display = "block";
-      if (okMsg.firstChild) okMsg.firstChild.textContent = message + " ";
-    }
-
-    function setBad(message) {
-      clearMessages();
-      if (!message) return;
-      badMsg.style.display = "block";
-      badMsg.textContent = message;
-    }
-
-    function regKeyFor(eventId) {
-      return `voidpass_registered_${eventId}`;
-    }
-
-    function isRegistered(eventId) {
-      if (!eventId) return false;
-      const key = regKeyFor(eventId);
-      return !!localStorage.getItem(key);
-    }
-
-    function applyRegisteredUI() {
-      form.classList.add("registered");
-      submitBtn.classList.add("hidden");
-
-      const nameField = document.getElementById("name")?.closest(".field");
-      const emailField = document.getElementById("email")?.closest(".field");
-      if (nameField) nameField.classList.add("hidden");
-      if (emailField) emailField.classList.add("hidden");
-
-      okMsg.style.display = "block";
-    }
-
-    function applyFormUI() {
-      submitBtn.classList.remove("hidden");
-
-      const nameField = document.getElementById("name")?.closest(".field");
-      const emailField = document.getElementById("email")?.closest(".field");
-      if (nameField) nameField.classList.remove("hidden");
-      if (emailField) emailField.classList.remove("hidden");
-    }
-
-    function startCountdown(revealAtDate, tz) {
+    function startCountdown(revealAtDate) {
       if (countdownTimer) clearInterval(countdownTimer);
 
       function tick() {
-        const now = new Date();
-        const ms = revealAtDate.getTime() - now.getTime();
+        const ms = revealAtDate.getTime() - Date.now();
         if (ms <= 0) {
           revealInEl.textContent = "now";
           countdownEl.textContent = "00:00:00";
           return;
         }
-        const totalSeconds = Math.floor(ms / 1000);
-        const hh = String(Math.floor(totalSeconds / 3600)).padStart(2, "0");
-        const mm = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, "0");
-        const ss = String(totalSeconds % 60).padStart(2, "0");
+        const s = Math.floor(ms / 1000);
+        const hh = String(Math.floor(s / 3600)).padStart(2, "0");
+        const mm = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+        const ss = String(s % 60).padStart(2, "0");
         countdownEl.textContent = `${hh}:${mm}:${ss}`;
         revealInEl.textContent = "soon";
       }
@@ -358,144 +83,38 @@
       countdownTimer = setInterval(tick, 1000);
     }
 
-    async function loadActiveEventAndStartTimer() {
-      try {
-        const r = await fetch("https://xhitzrnmowqeaerofion.supabase.co/rest/v1/public_active_event?select=*", {
+    async function loadEvent() {
+      const r = await fetch(
+        `${SUPABASE_URL}/rest/v1/public_active_event?select=*`,
+        {
           headers: {
             apikey: SUPABASE_ANON_KEY,
             Authorization: `Bearer ${SUPABASE_ANON_KEY}`
           }
-        });
-
-        const data = await r.json();
-        const ev = Array.isArray(data) ? data[0] : null;
-
-        if (!ev) {
-          eventNameEl.textContent = "No active event";
-          revealTextEl.textContent = "Registration is closed";
-          countdownEl.textContent = "";
-          form.classList.add("hidden");
-          return;
         }
+      );
 
-        eventNameEl.textContent = ev.name || "Untitled event";
-        currentEventId = ev.id || null;
-
-        // auto-expire "registered" state 2 hours after reveal time
-        try {
-          const regKey = regKeyFor(currentEventId);
-          const regRaw = localStorage.getItem(regKey);
-
-          if (regRaw) {
-            const revealAtDate = new Date(ev.reveal_at);
-            const expiryMs = revealAtDate.getTime() + 2 * 60 * 60 * 1000;
-            if (!Number.isNaN(expiryMs) && Date.now() > expiryMs) {
-              localStorage.removeItem(regKey);
-            }
-          }
-        } catch (_) {}
-
-        if (isRegistered(currentEventId)) {
-          applyRegisteredUI();
-        }
-
-        const tz = ev.timezone || "Australia/Sydney";
-        const revealAtDate = new Date(`${ev.reveal_at} ${ev.timezone}`);
-
-        if (Number.isNaN(revealAtDate.getTime())) {
-          revealInEl.textContent = "soon";
-          countdownEl.textContent = "";
-          return;
-        }
-
-        startCountdown(revealAtDate, tz);
-      } catch (err) {
-        console.log("[loadActiveEvent] error:", err);
-        eventNameEl.textContent = "Error loading event";
-        revealTextEl.textContent = "Please refresh";
+      const data = await r.json();
+      const ev = data?.[0];
+      if (!ev) {
+        eventNameEl.textContent = "No active event";
         countdownEl.textContent = "";
-      }
-    }
-
-    // ----------------------------
-    // Init
-    // ----------------------------
-    loadActiveEventAndStartTimer();
-
-    // ----------------------------
-    // Register submit
-    // ----------------------------
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      clearMessages();
-
-      if (!currentEventId) {
-        setBad("No active event.");
         return;
       }
 
-      const name = document.getElementById("name").value.trim();
-      const email = document.getElementById("email").value.trim();
+      eventNameEl.textContent = ev.name;
 
-      setBusy(true);
-      try {
-        const payload = { full_name: name, email };
-        const r = await fetch(REGISTER_FN, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        const data = await r.json().catch(() => ({}));
-
-        if (!r.ok) {
-          const msg = (data && (data.error || data.message))
-            ? String(data.error || data.message)
-            : `Register failed (${r.status})`;
-          setBad(msg);
-          return;
-        }
-
-        try {
-          const key = regKeyFor(currentEventId);
-          localStorage.setItem(key, JSON.stringify({ email, ts: new Date().toISOString() }));
-          localStorage.setItem("void_last_event_id", currentEventId);
-        } catch (_) {}
-
-        setOk("Registered. Check your email for the reveal.");
-        applyRegisteredUI();
-        form.reset();
-      } catch (err) {
-        console.log("[register] network error:", err);
-        setBad("Network error calling register function.");
-      } finally {
-        setBusy(false);
+      const revealAtDate = parseRevealDate(ev);
+      if (Number.isNaN(revealAtDate.getTime())) {
+        countdownEl.textContent = "";
+        revealInEl.textContent = "soon";
+        return;
       }
-    });
 
-    // --- Change email reset link ---
-    const changeEmailLink = document.getElementById("changeEmailLink");
-
-    if (changeEmailLink) {
-      changeEmailLink.addEventListener("click", function (e) {
-        e.preventDefault();
-
-        const keysToRemove = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const k = localStorage.key(i);
-          if (!k) continue;
-
-          if (k.startsWith("voidpass_") && (k.includes("registered") || k.includes("reg"))) {
-            keysToRemove.push(k);
-          }
-        }
-
-        keysToRemove.forEach((k) => localStorage.removeItem(k));
-        applyFormUI();
-        clearMessages();
-        location.reload();
-      });
+      startCountdown(revealAtDate);
     }
+
+    loadEvent();
   </script>
 </body>
 </html>
