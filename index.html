@@ -400,7 +400,7 @@
         }
 
         const tz = ev.timezone || "Australia/Sydney";
-        const revealAtDate = new Date(ev.reveal_at);
+        const revealAtDate = new Date(`${ev.reveal_at} ${ev.timezone}`);
 
         if (Number.isNaN(revealAtDate.getTime())) {
           revealInEl.textContent = "soon";
