@@ -1,415 +1,428 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Voidpass Admin</title>
-  <link rel="icon" type="image/png" href="/favicon.png">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>VOIDPASS ADMIN</title>
+  <link rel="icon" type="image/png" href="/favicon.png" />
+
   <style>
     :root{
-      --bg:#06070b;
+      --bg:#070814;
       --panel:rgba(255,255,255,0.07);
-      --panel2:rgba(255,255,255,0.05);
+      --panel2:rgba(255,255,255,0.06);
       --line:rgba(255,255,255,0.10);
       --text:rgba(255,255,255,0.92);
       --muted:rgba(255,255,255,0.65);
-      --good:rgba(120,255,180,0.95);
-      --bad:rgba(255,120,140,0.95);
+      --good:rgba(120,255,180,0.92);
+      --bad:rgba(255,130,150,0.92);
       --shadow:0 20px 60px rgba(0,0,0,0.45);
-      --radius:22px;
+      --radius:18px;
+      --radius2:14px;
     }
-    *{box-sizing:border-box}
+
     body{
       margin:0;
       min-height:100vh;
       display:flex;
-      justify-content:center;
       align-items:flex-start;
+      justify-content:center;
       padding:22px;
       color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
       background:
-        radial-gradient(1200px 800px at 20% 0%, rgba(164,79,255,0.18), transparent 55%),
-        radial-gradient(1000px 700px at 80% 10%, rgba(79,164,255,0.14), transparent 55%),
-        radial-gradient(900px 700px at 50% 90%, rgba(79,255,182,0.07), transparent 55%),
+        radial-gradient(1200px 700px at 20% 10%, rgba(120,140,255,0.14), transparent 60%),
+        radial-gradient(900px 700px at 80% 20%, rgba(255,120,180,0.10), transparent 55%),
+        radial-gradient(1100px 900px at 50% 80%, rgba(60,255,210,0.07), transparent 65%),
         var(--bg);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     }
-    .wrap{width:min(1100px, 100%)}
-    .topbar{
+
+    .wrap{ width:min(980px, 100%); }
+    .top{
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:12px;
       margin-bottom:14px;
     }
     .brand{
-      letter-spacing:0.28em;
+      letter-spacing:0.22em;
       text-transform:uppercase;
-      font-weight:650;
-      opacity:0.9;
+      font-weight:700;
       font-size:14px;
+      opacity:0.9;
     }
+    .pillbar{ display:flex; gap:10px; align-items:center; }
     .pill{
-      background:var(--panel2);
+      background:var(--panel);
       border:1px solid var(--line);
       border-radius:999px;
-      padding:10px 12px;
-      box-shadow:var(--shadow);
-      display:flex;
-      align-items:center;
-      gap:10px;
+      padding:9px 12px;
+      font-size:13px;
+      color:var(--muted);
       backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .btn{
-      cursor:pointer;
+      box-shadow: var(--shadow);
       user-select:none;
-      border-radius:14px;
+      max-width: 56ch;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    button{
+      cursor:pointer;
+      border-radius:12px;
       padding:10px 14px;
       border:1px solid var(--line);
-      background:rgba(255,255,255,0.06);
+      background:rgba(255,255,255,0.08);
       color:var(--text);
       font-weight:600;
     }
-    .btn:disabled{
-      opacity:0.45;
-      cursor:not-allowed;
-    }
-    .card{
-      background:var(--panel);
+    button:disabled{ opacity:0.55; cursor:not-allowed; }
+
+    .panel{
+      background:var(--panel2);
       border:1px solid var(--line);
       border-radius:var(--radius);
-      box-shadow:var(--shadow);
-      padding:18px;
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      padding:16px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
     }
-    .loginRow{
-      display:grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap:10px;
-      margin-top:10px;
-    }
-    input{
-      width:100%;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,0.22);
-      color:var(--text);
-      padding:12px 12px;
-      outline:none;
-      font-size:14px;
-    }
-    input::placeholder{color:rgba(255,255,255,0.45)}
-    .hint{
-      margin-top:10px;
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,0.20);
-      color:var(--muted);
-      font-size:13px;
-    }
-    .status{
-      margin-top:12px;
-      padding:10px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,0.22);
-      color:var(--muted);
-      font-size:13px;
-    }
-    .status.good{color:var(--good)}
-    .status.bad{color:var(--bad)}
+
     .grid{
-      margin-top:16px;
       display:grid;
-      grid-template-columns: 1fr 1fr;
       gap:14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top:14px;
     }
-    @media (max-width: 820px){
-      .grid{grid-template-columns: 1fr}
-      .loginRow{grid-template-columns: 1fr}
+
+    .card{
+      background:rgba(255,255,255,0.06);
+      border:1px solid var(--line);
+      border-radius:var(--radius2);
+      padding:14px;
+      min-height:110px;
     }
-    .boxTitle{
-      font-size:12px;
-      letter-spacing:0.18em;
+
+    .card h3{
+      margin:0 0 8px 0;
+      font-size:13px;
+      letter-spacing:0.14em;
       text-transform:uppercase;
-      opacity:0.8;
-      margin-bottom:8px;
+      opacity:0.85;
     }
+
     .big{
       font-size:22px;
-      font-weight:750;
-      margin:2px 0 6px;
+      font-weight:800;
+      letter-spacing:0.02em;
+      margin:0 0 6px 0;
     }
-    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;}
-    .small{font-size:13px;color:var(--muted);line-height:1.35}
-    .rowline{margin-top:6px;color:var(--muted);font-size:13px}
-    .divider{height:1px;background:var(--line);margin:14px 0}
-    a{color:rgba(180,220,255,0.95)}
+    .mono{
+      font-variant-numeric: tabular-nums;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+    .muted{ color:var(--muted); }
+
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:center;
+    }
+    .row input{
+      flex:1;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      outline:none;
+    }
+    .hr{
+      margin:14px 0;
+      height:1px;
+      background:var(--line);
+      border:0;
+    }
+    .statusline{
+      margin-top:10px;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(0,0,0,0.18);
+      color:var(--muted);
+      min-height: 20px;
+      white-space:pre-wrap;
+    }
+    .good{ color: var(--good); }
+    .bad{ color: var(--bad); }
+    @media (max-width: 820px){
+      .grid{ grid-template-columns: 1fr; }
+      .pill{ max-width: 34ch; }
+    }
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <div class="topbar">
+    <div class="top">
       <div class="brand">• VOIDPASS ADMIN •</div>
-      <div class="pill">
-        <div id="who" class="small">Not signed in</div>
-        <button id="btnRefresh" class="btn" disabled>Refresh</button>
-        <button id="btnLogout" class="btn" disabled>Logout</button>
+      <div class="pillbar">
+        <div id="who" class="pill">Not signed in</div>
+        <button id="btnRefresh" type="button">Refresh</button>
+        <button id="btnLogout" type="button">Logout</button>
       </div>
     </div>
 
-    <div class="card">
-      <div class="loginRow">
-        <input id="email" type="email" autocomplete="username" placeholder="Email" />
-        <input id="password" type="password" autocomplete="current-password" placeholder="Password" />
-        <button id="btnLogin" class="btn">Login</button>
+    <div class="panel">
+      <div class="row">
+        <input id="email" type="email" placeholder="Email" autocomplete="username" />
+        <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+        <button id="btnLogin" type="button">Login</button>
       </div>
 
-      <div class="hint">
-        Tip: This page only works for allowlisted organizer/admin emails.<br/>
-        Allowlist lives in <span class="mono">organizer_allowlist</span> and access is enforced by RLS.
-      </div>
+      <div class="statusline mono" id="status">Idle.</div>
 
-      <div id="status" class="status">Idle.</div>
-
-      <div class="divider"></div>
+      <hr class="hr"/>
 
       <div class="grid">
         <div class="card">
-          <div class="boxTitle">Active event</div>
-          <div id="evName" class="big">—</div>
-          <div id="evMeta" class="rowline mono">—</div>
+          <h3>Active Event</h3>
+          <div class="big" id="evName">—</div>
+          <div class="muted mono" id="evMeta">—</div>
         </div>
 
         <div class="card">
-          <div class="boxTitle">Registrations</div>
-          <div id="regTotal" class="big">—</div>
-          <div id="regMeta" class="rowline mono">—</div>
+          <h3>Registrations</h3>
+          <div class="big" id="regTotal">—</div>
+          <div class="muted mono" id="regMeta">—</div>
         </div>
 
         <div class="card">
-          <div class="boxTitle">Reveal emails</div>
-          <div id="mailTotal" class="big">—</div>
-          <div id="mailMeta" class="rowline mono">—</div>
+          <h3>Reveal Emails</h3>
+          <div class="big" id="logTotal">—</div>
+          <div class="muted mono" id="logMeta">—</div>
         </div>
 
         <div class="card">
-          <div class="boxTitle">Notes</div>
-          <div class="small">
-            If this page hangs on “Fetching…”, it means RLS blocked reads (not allowlisted) or auth isn’t ready yet.<br/><br/>
-            Public site stays at <a href="/index.html">index.html</a>.
+          <h3>Notes</h3>
+          <div class="muted" style="line-height:1.45">
+            This page only works for allowlisted organizer/admin emails.<br/>
+            Allowlist lives in <span class="mono">public.organizer_allowlist</span>.<br/>
+            If you see <span class="mono">Organizer access required</span>, you are signed in but not allowlisted.
           </div>
         </div>
       </div>
     </div>
-
-    <!-- Supabase JS (must be loaded before our script) -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
-
-    <script>
-      // ===== CONFIG =====
-      const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
-
-      // ===== CLIENT =====
-      const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-      // ===== UI =====
-      const el = (id) => document.getElementById(id);
-      const setStatus = (text, kind="") => {
-        const s = el("status");
-        s.className = "status" + (kind ? (" " + kind) : "");
-        s.textContent = text;
-      };
-
-      const setSignedInUI = (email) => {
-        el("who").textContent = email ? ("Signed in: " + email) : "Not signed in";
-        const signed = !!email;
-        el("btnLogout").disabled = !signed;
-        el("btnRefresh").disabled = !signed;
-      };
-
-      const clearDashboard = () => {
-        el("evName").textContent = "—";
-        el("evMeta").textContent = "—";
-        el("regTotal").textContent = "—";
-        el("regMeta").textContent = "—";
-        el("mailTotal").textContent = "—";
-        el("mailMeta").textContent = "—";
-      };
-
-      async function requireOrganizer() {
-        const { data, error } = await sb.rpc("is_organizer");
-        if (error) throw new Error("Organizer check failed: " + error.message);
-        if (!data) throw new Error("Organizer access required (not allowlisted).");
-        return true;
-      }
-
-      async function getActiveEvent() {
-        const { data, error } = await sb
-          .from("events")
-          .select("id,name,status,reveal_at,end_at,timezone,created_at")
-          .eq("status", "active")
-          .order("created_at", { ascending: false })
-          .limit(1);
-
-        if (error) throw new Error("events select failed: " + error.message);
-        return (Array.isArray(data) && data.length) ? data[0] : null;
-      }
-
-      async function getRegistrationCounts(eventId) {
-        const totalQ = await sb
-          .from("registrations")
-          .select("id", { count: "exact", head: true })
-          .eq("event_id", eventId);
-
-        if (totalQ.error) throw new Error("registrations count failed: " + totalQ.error.message);
-        const total = totalQ.count ?? 0;
-
-        const revealedQ = await sb
-          .from("registrations")
-          .select("id", { count: "exact", head: true })
-          .eq("event_id", eventId)
-          .not("reveal_sent_at", "is", null);
-
-        if (revealedQ.error) throw new Error("registrations revealed count failed: " + revealedQ.error.message);
-        const revealed = revealedQ.count ?? 0;
-
-        const pending = Math.max(0, total - revealed);
-        return { total, revealed, pending };
-      }
-
-      async function getEmailLogCounts(eventId) {
-        const { data, error } = await sb
-          .from("email_logs")
-          .select("id,status,metadata,created_at")
-          .order("created_at", { ascending: false })
-          .limit(200);
-
-        if (error) throw new Error("email_logs select failed: " + error.message);
-
-        const rows = Array.isArray(data) ? data : [];
-        const filtered = rows.filter(r => {
-          const m = r.metadata || {};
-          return m.event_id === eventId && m.service === "reveal_sender";
-        });
-
-        const total = filtered.length;
-        const ok = filtered.filter(r => (r.status || "").toLowerCase() === "ok").length;
-        const failed = filtered.filter(r => (r.status || "").toLowerCase() === "failed").length;
-        const inflight = Math.max(0, total - ok - failed);
-
-        return { total, ok, failed, inflight };
-      }
-
-      async function loadDashboard() {
-        setStatus("Fetching admin dashboard…");
-        clearDashboard();
-
-        await requireOrganizer();
-
-        const ev = await getActiveEvent();
-        if (!ev) {
-          el("evName").textContent = "No active event";
-          el("evMeta").textContent = "status=none";
-          el("regTotal").textContent = "0 total";
-          el("regMeta").textContent = "revealed=0 | pending=0";
-          el("mailTotal").textContent = "0 logs";
-          el("mailMeta").textContent = "ok=0 | failed=0 | inflight=0";
-          setStatus("Loaded. (No active event)", "good");
-          return;
-        }
-
-        el("evName").textContent = ev.name || "—";
-        el("evMeta").textContent =
-          `status=${ev.status} | reveal_at=${ev.reveal_at} | end_at=${ev.end_at} | tz=${ev.timezone}`;
-
-        const regs = await getRegistrationCounts(ev.id);
-        el("regTotal").textContent = `${regs.total} total`;
-        el("regMeta").textContent = `revealed=${regs.revealed} | pending=${regs.pending}`;
-
-        const mails = await getEmailLogCounts(ev.id);
-        el("mailTotal").textContent = `${mails.total} logs`;
-        el("mailMeta").textContent = `ok=${mails.ok} | failed=${mails.failed} | inflight=${mails.inflight}`;
-
-        setStatus("Loaded.", "good");
-      }
-
-      async function refreshAuthUI() {
-        const { data: { session }, error } = await sb.auth.getSession();
-        if (error) {
-          setSignedInUI(null);
-          setStatus("Auth error: " + error.message, "bad");
-          return null;
-        }
-        setSignedInUI(session?.user?.email || null);
-        return session;
-      }
-
-      async function init() {
-        await refreshAuthUI();
-
-        sb.auth.onAuthStateChange(async (_event, session) => {
-          setSignedInUI(session?.user?.email || null);
-          if (session) {
-            try { await loadDashboard(); }
-            catch (e) { setStatus(e.message || String(e), "bad"); }
-          } else {
-            clearDashboard();
-            setStatus("Idle.");
-          }
-        });
-
-        const { data: { session } } = await sb.auth.getSession();
-        if (session) {
-          try { await loadDashboard(); }
-          catch (e) { setStatus(e.message || String(e), "bad"); }
-        }
-      }
-
-      async function doLogin() {
-        const email = (el("email").value || "").trim();
-        const password = (el("password").value || "");
-        if (!email || !password) {
-          setStatus("Enter email + password.", "bad");
-          return;
-        }
-        setStatus("Signing in…");
-        const { data, error } = await sb.auth.signInWithPassword({ email, password });
-        if (error) {
-          setStatus("Login failed: " + error.message, "bad");
-          return;
-        }
-        setSignedInUI(data?.user?.email || email);
-      }
-
-      async function doLogout() {
-        setStatus("Signing out…");
-        await sb.auth.signOut();
-        setSignedInUI(null);
-        clearDashboard();
-        setStatus("Signed out.", "good");
-      }
-
-      el("btnLogin").addEventListener("click", doLogin);
-      el("btnLogout").addEventListener("click", doLogout);
-      el("btnRefresh").addEventListener("click", async () => {
-        try { await loadDashboard(); }
-        catch (e) { setStatus(e.message || String(e), "bad"); }
-      });
-
-      ["email", "password"].forEach(id => {
-        el(id).addEventListener("keydown", (e) => {
-          if (e.key === "Enter") doLogin();
-        });
-      });
-
-      init().catch(e => setStatus("Init error: " + (e.message || String(e)), "bad"));
-    </script>
   </div>
+
+  <!-- Supabase JS (UMD build) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+  <script>
+    // ============ CONFIG ============
+    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+    const SUPABASE_ANON_KEY = "PASTE_YOUR_ANON_KEY_HERE";
+
+    // ============ CLIENT ============
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // ============ UI ============
+    const el = (id) => document.getElementById(id);
+    const who = el("who");
+    const statusEl = el("status");
+
+    const btnLogin = el("btnLogin");
+    const btnLogout = el("btnLogout");
+    const btnRefresh = el("btnRefresh");
+
+    const evName = el("evName");
+    const evMeta = el("evMeta");
+    const regTotal = el("regTotal");
+    const regMeta = el("regMeta");
+    const logTotal = el("logTotal");
+    const logMeta = el("logMeta");
+
+    function setStatus(msg, kind="") {
+      statusEl.classList.remove("good", "bad");
+      if (kind) statusEl.classList.add(kind);
+      statusEl.textContent = msg;
+      console.log("[admin]", msg);
+    }
+
+    function setSignedInLabel(session) {
+      const email = session?.user?.email || "";
+      who.textContent = email ? `Signed in: ${email}` : "Not signed in";
+    }
+
+    function resetCards() {
+      evName.textContent = "—";
+      evMeta.textContent = "—";
+      regTotal.textContent = "—";
+      regMeta.textContent = "—";
+      logTotal.textContent = "—";
+      logMeta.textContent = "—";
+    }
+
+    // ============ AUTH ============
+    async function doLogin() {
+      const email = el("email").value.trim();
+      const password = el("password").value;
+
+      if (!email || !password) {
+        setStatus("Please enter email + password.", "bad");
+        return;
+      }
+
+      setStatus("Auth: signing in…");
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        setStatus("Auth error: " + error.message, "bad");
+        return;
+      }
+
+      setSignedInLabel(data.session);
+      setStatus("Auth: signed in. Proceeding…", "good");
+      await gateAndLoad();
+    }
+
+    async function doLogout() {
+      setStatus("Auth: signing out…");
+      await sb.auth.signOut();
+      setSignedInLabel(null);
+      resetCards();
+      setStatus("Signed out.");
+    }
+
+    btnLogin.addEventListener("click", doLogin);
+    btnLogout.addEventListener("click", doLogout);
+    btnRefresh.addEventListener("click", gateAndLoad);
+
+    // ============ ORG GATE ============
+    async function checkOrganizer() {
+      setStatus("Gate: checking organizer allowlist…");
+
+      // This will create a visible network request /rpc/is_organizer
+      const { data, error } = await sb.rpc("is_organizer");
+      if (error) {
+        setStatus("Gate error calling is_organizer(): " + error.message, "bad");
+        return false;
+      }
+      if (data !== true) {
+        setStatus("Organizer access required (not allowlisted).", "bad");
+        return false;
+      }
+
+      setStatus("Gate: organizer confirmed ✅", "good");
+      return true;
+    }
+
+    // ============ DASHBOARD LOAD ============
+    async function loadDashboard() {
+      setStatus("Dashboard: loading…");
+
+      // Active event
+      const evRes = await sb.from("events")
+        .select("id,name,status,reveal_at,end_at,timezone,created_at")
+        .eq("status", "active")
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      if (evRes.error) {
+        setStatus("Dashboard error (events): " + evRes.error.message, "bad");
+        return;
+      }
+
+      const ev = evRes.data?.[0] || null;
+      if (!ev) {
+        evName.textContent = "No active event";
+        evMeta.textContent = "—";
+        regTotal.textContent = "—";
+        regMeta.textContent = "—";
+        logTotal.textContent = "—";
+        logMeta.textContent = "—";
+        setStatus("Dashboard loaded: no active event.", "good");
+        return;
+      }
+
+      evName.textContent = ev.name || "(unnamed)";
+      evMeta.textContent = `status=${ev.status} | reveal_at=${ev.reveal_at} | end_at=${ev.end_at} | tz=${ev.timezone}`;
+
+      // Registrations counts
+      const regRes = await sb.from("registrations")
+        .select("id,reveal_sent_at", { count: "exact" })
+        .eq("event_id", ev.id);
+
+      if (regRes.error) {
+        setStatus("Dashboard error (registrations): " + regRes.error.message, "bad");
+        return;
+      }
+
+      const total = regRes.count ?? (regRes.data?.length ?? 0);
+      const revealed = (regRes.data || []).filter(r => r.reveal_sent_at != null).length;
+      const pending = total - revealed;
+
+      regTotal.textContent = `${total} total`;
+      regMeta.textContent = `revealed=${revealed} | pending=${pending}`;
+
+      // Email logs counts (best-effort: if table exists)
+      const logRes = await sb.from("email_logs")
+        .select("id, metadata", { count: "exact" })
+        .eq("metadata->>event_id", ev.id);
+
+      if (logRes.error) {
+        // Don’t fail the whole dashboard if logs table policy/table differs
+        logTotal.textContent = "—";
+        logMeta.textContent = "email_logs not accessible";
+        setStatus("Dashboard loaded (email_logs not accessible): " + logRes.error.message, "good");
+        return;
+      }
+
+      const logsTotal = logRes.count ?? (logRes.data?.length ?? 0);
+      logTotal.textContent = `${logsTotal} logs`;
+      logMeta.textContent = "ok";
+
+      setStatus("Dashboard loaded ✅", "good");
+    }
+
+    async function gateAndLoad() {
+      resetCards();
+
+      const { data: { session } } = await sb.auth.getSession();
+      setSignedInLabel(session);
+
+      if (!session) {
+        setStatus("No session. Please log in.");
+        return;
+      }
+
+      const ok = await checkOrganizer();
+      if (!ok) return;
+
+      await loadDashboard();
+    }
+
+    // ============ BOOT ============
+    (async () => {
+      setStatus("Boot: waiting for auth…");
+      const { data: { session } } = await sb.auth.getSession();
+      setSignedInLabel(session);
+
+      // Use auth state change to avoid race conditions / infinite fetching
+      sb.auth.onAuthStateChange((_event, session2) => {
+        setSignedInLabel(session2);
+        if (session2) {
+          gateAndLoad();
+        } else {
+          resetCards();
+          setStatus("Signed out.");
+        }
+      });
+
+      if (session) {
+        await gateAndLoad();
+      } else {
+        setStatus("Not signed in. Enter email + password then Login.");
+      }
+    })();
+  </script>
 </body>
 </html>
