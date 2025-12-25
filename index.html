@@ -240,25 +240,21 @@
       </p>
     </div>
   </div>
-  
 
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  
+  <!-- Supabase JS (UMD build; exposes window.supabase reliably) -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <script>
-  
-  
-    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
-
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_ANON_KEY
-);
-
     // ----------------------------
     // Config
     // ----------------------------
+    const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+
+    // NOTE: We intentionally do NOT create a supabase client here,
+    // because this page uses fetch() directly.
+    // This prevents redeclare/duplicate-client issues.
+
     const SUPABASE_FUNCTION_BASE = "https://xhitzrnmowqeaerofion.supabase.co/functions/v1";
     const REGISTER_FN = `${SUPABASE_FUNCTION_BASE}/register`;
 
@@ -298,7 +294,6 @@ const supabase = window.supabase.createClient(
       clearMessages();
       if (!message) return;
       okMsg.style.display = "block";
-      // Replace only the leading text node (keeps the "Change email" link intact)
       if (okMsg.firstChild) okMsg.firstChild.textContent = message + " ";
     }
 
@@ -339,7 +334,6 @@ const supabase = window.supabase.createClient(
       if (nameField) nameField.classList.remove("hidden");
       if (emailField) emailField.classList.remove("hidden");
     }
-
 
     function startCountdown(revealAtDate, tz) {
       if (countdownTimer) clearInterval(countdownTimer);
@@ -385,27 +379,22 @@ const supabase = window.supabase.createClient(
         }
 
         eventNameEl.textContent = ev.name || "Untitled event";
-
-        // Step B: keep track of the current event id for registration persistence
         currentEventId = ev.id || null;
 
-        // Step 3: auto-expire the local "registered" state 2 hours after reveal time
+        // auto-expire "registered" state 2 hours after reveal time
         try {
           const regKey = regKeyFor(currentEventId);
           const regRaw = localStorage.getItem(regKey);
 
           if (regRaw) {
             const revealAtDate = new Date(String(ev.reveal_at).replace(" ", "T"));
-            const expiryMs = revealAtDate.getTime() + 2 * 60 * 60 * 1000; // +2 hours
+            const expiryMs = revealAtDate.getTime() + 2 * 60 * 60 * 1000;
             if (!Number.isNaN(expiryMs) && Date.now() > expiryMs) {
               localStorage.removeItem(regKey);
             }
           }
-        } catch (_) {
-          // ignore localStorage/JSON issues
-        }
+        } catch (_) {}
 
-        // If this browser has already registered for this event, show the registered state
         if (isRegistered(currentEventId)) {
           applyRegisteredUI();
         }
@@ -467,7 +456,6 @@ const supabase = window.supabase.createClient(
           return;
         }
 
-        // Persist registration state per event on this device (Step B)
         try {
           const key = regKeyFor(currentEventId);
           localStorage.setItem(key, JSON.stringify({ email, ts: new Date().toISOString() }));
@@ -492,7 +480,6 @@ const supabase = window.supabase.createClient(
       changeEmailLink.addEventListener("click", function (e) {
         e.preventDefault();
 
-        // Remove any saved voidpass registration state
         const keysToRemove = [];
         for (let i = 0; i < localStorage.length; i++) {
           const k = localStorage.key(i);
@@ -510,8 +497,5 @@ const supabase = window.supabase.createClient(
       });
     }
   </script>
-
-
 </body>
 </html>
-
