@@ -281,7 +281,7 @@
       setStatus("Logged out.", "msg");
     }
 
-    b.auth.onAuthStateChange(async (_event, session) => {
+     sb.auth.onAuthStateChange(async (_event, session) => {
       const email = session?.user?.email || null;
       setSignedInUI(email);
 
