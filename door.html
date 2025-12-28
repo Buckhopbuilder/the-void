@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Voidpass Door</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; background:#0b0f1a; color:#e6e6e6; }
+    .wrap { max-width: 720px; margin: 0 auto; padding: 24px; }
+    .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin: 12px 0; }
+    .row { display:flex; gap: 12px; flex-wrap: wrap; }
+    label { display:block; font-size: 12px; opacity: 0.85; margin: 10px 0 6px; }
+    input, select, button {
+      width: 100%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.10);
+      color: #e6e6e6;
+      border-radius: 12px;
+      padding: 12px;
+      font-size: 14px;
+      outline: none;
+    }
+    button { cursor:pointer; font-weight: 700; }
+    button:disabled { opacity: 0.5; cursor:not-allowed; }
+    .btn { background: rgba(120,255,200,0.10); border-color: rgba(120,255,200,0.25); }
+    .btn2 { background: rgba(120,180,255,0.10); border-color: rgba(120,180,255,0.25); }
+    .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; border:1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); }
+    .ok { border-color: rgba(120,255,200,0.35); background: rgba(120,255,200,0.10); }
+    .bad { border-color: rgba(255,120,120,0.35); background: rgba(255,120,120,0.10); }
+    pre { white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.35); padding: 12px; border-radius: 12px; border:1px solid rgba(255,255,255,0.08); }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="row" style="justify-content: space-between; align-items:center;">
+        <div>
+          <strong>VOIDPASS DOOR</strong>
+          <div style="opacity:.75;font-size:12px;">Door staff check-in (manual + QR)</div>
+        </div>
+        <span id="authPill" class="pill bad">Not signed in</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <label>Email</label>
+      <input id="email" type="email">
+      <label>Password</label>
+      <input id="password" type="password">
+      <div class="row">
+        <button id="signIn" class="btn2">Sign in</button>
+        <button id="signOut">Sign out</button>
+      </div>
+    </div>
+
+    <div class="card" id="tool" style="display:none;">
+      <label>Guest email</label>
+      <input id="guestEmail" type="email">
+      <label>Full name</label>
+      <input id="guestName" type="text">
+      <button id="checkin" class="btn">Manual check-in</button>
+    </div>
+
+    <div class="card">
+      <strong>Result</strong>
+      <span id="resultPill" class="pill">Idle</span>
+      <pre id="out">{}</pre>
+    </div>
+  </div>
+
+<script type="module">
+  import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+  const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+  const SUPABASE_ANON_KEY =
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  const authPill = document.getElementById("authPill");
+  const tool = document.getElementById("tool");
+  const out = document.getElementById("out");
+  const resultPill = document.getElementById("resultPill");
+
+  function showResult(ok, data) {
+    out.textContent = JSON.stringify(data, null, 2);
+    resultPill.className = "pill " + (ok ? "ok" : "bad");
+    resultPill.textContent = ok ? "OK" : "ERROR";
+  }
+
+  async function refresh() {
+    const { data } = await supabase.auth.getSession();
+    if (data.session) {
+      authPill.textContent = "Signed in";
+      authPill.className = "pill ok";
+      tool.style.display = "";
+    } else {
+      authPill.textContent = "Not signed in";
+      authPill.className = "pill bad";
+      tool.style.display = "none";
+    }
+  }
+
+  document.getElementById("signIn").onclick = async () => {
+    await supabase.auth.signInWithPassword({
+      email: email.value,
+      password: password.value
+    });
+    refresh();
+  };
+
+  document.getElementById("signOut").onclick = async () => {
+    await supabase.auth.signOut();
+    refresh();
+  };
+
+  document.getElementById("checkin").onclick = async () => {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    const res = await fetch(
+      "https://xhitzrnmowqeaerofion.supabase.co/functions/v1/door_checkin",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          action: "manual",
+          email: guestEmail.value,
+          full_name: guestName.value
+        })
+      }
+    );
+    const json = await res.json();
+    showResult(res.ok && json.ok, json);
+  };
+
+  refresh();
+</script>
+</body>
+</html>
