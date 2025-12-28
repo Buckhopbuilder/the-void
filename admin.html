@@ -154,9 +154,49 @@
     }
     .good{ color: var(--good); }
     .bad{ color: var(--bad); }
+
+    /* Event manager layout */
+    .span2 { grid-column: 1 / -1; }
+    .formgrid{
+      display:grid;
+      gap:10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .formgrid .full { grid-column: 1 / -1; }
+    .formgrid label{
+      display:block;
+      font-size:12px;
+      letter-spacing:0.08em;
+      text-transform:uppercase;
+      opacity:0.75;
+      margin:2px 0 6px 2px;
+    }
+    .field input, .field select{
+      width:100%;
+      padding:12px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      outline:none;
+      box-sizing:border-box;
+    }
+    .actions{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin-top:10px;
+    }
+    .tiny{
+      font-size:12px;
+      opacity:0.75;
+      line-height:1.35;
+    }
+
     @media (max-width: 820px){
       .grid{ grid-template-columns: 1fr; }
       .pill{ max-width: 34ch; }
+      .formgrid{ grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -210,6 +250,70 @@
             If you see <span class="mono">Organizer access required</span>, you are signed in but not allowlisted.
           </div>
         </div>
+
+        <!-- NEW: Event Manager -->
+        <div class="card span2" id="eventManagerCard">
+          <h3>Event Manager</h3>
+          <div class="muted tiny">
+            Creates events via <span class="mono">admin_events</span> (service role), but only for allowlisted organizers.
+            Create as <span class="mono">draft</span>, then activate. Only one <span class="mono">active</span> event is allowed.
+          </div>
+
+          <div style="height:10px"></div>
+
+          <div class="formgrid">
+            <div class="field full">
+              <label>Event ID (auto-filled after create)</label>
+              <input id="em_event_id" type="text" placeholder="(will appear after draft creation)" class="mono" />
+            </div>
+
+            <div class="field">
+              <label>Event name</label>
+              <input id="em_name" type="text" placeholder="e.g. The Void" />
+            </div>
+
+            <div class="field">
+              <label>Timezone</label>
+              <input id="em_timezone" type="text" value="Australia/Sydney" class="mono" />
+            </div>
+
+            <div class="field">
+              <label>Reveal at (local)</label>
+              <input id="em_reveal_at" type="datetime-local" />
+            </div>
+
+            <div class="field">
+              <label>End at (local)</label>
+              <input id="em_end_at" type="datetime-local" />
+            </div>
+
+            <div class="field">
+              <label>Location name</label>
+              <input id="em_location_name" type="text" placeholder="e.g. Studio 6" />
+            </div>
+
+            <div class="field">
+              <label>Location address</label>
+              <input id="em_location_address" type="text" placeholder="e.g. 6/102-104 Centennial Cct, Byron Bay NSW" />
+            </div>
+
+            <div class="field full">
+              <label>Maps URL (maps_url)</label>
+              <input id="em_maps_url" type="url" placeholder="https://maps.app.goo.gl/..." class="mono" />
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="btnCreateDraft" type="button">Create Draft Event</button>
+            <button id="btnActivate" type="button">Activate Event</button>
+            <button id="btnEnd" type="button">End Active Event</button>
+          </div>
+
+          <div class="muted tiny" style="margin-top:10px">
+            Tip: If you created a draft and want to activate it, click <span class="mono">Activate Event</span>.
+            If you already have an active event and want to stop it, click <span class="mono">End Active Event</span>.
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -221,6 +325,7 @@
     // ============ CONFIG ============
     const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+    const ADMIN_EVENTS_URL = `${SUPABASE_URL}/functions/v1/admin_events`;
 
     // ============ CLIENT ============
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
@@ -241,6 +346,23 @@
     const logTotal = el("logTotal");
     const logMeta = el("logMeta");
 
+    // Event Manager elements
+    const em_event_id = el("em_event_id");
+    const em_name = el("em_name");
+    const em_timezone = el("em_timezone");
+    const em_reveal_at = el("em_reveal_at");
+    const em_end_at = el("em_end_at");
+    const em_location_name = el("em_location_name");
+    const em_location_address = el("em_location_address");
+    const em_maps_url = el("em_maps_url");
+
+    const btnCreateDraft = el("btnCreateDraft");
+    const btnActivate = el("btnActivate");
+    const btnEnd = el("btnEnd");
+
+    // State
+    let currentActiveEventId = null;
+
     function setStatus(msg, kind="") {
       statusEl.classList.remove("good", "bad");
       if (kind) statusEl.classList.add(kind);
@@ -260,6 +382,52 @@
       regMeta.textContent = "—";
       logTotal.textContent = "—";
       logMeta.textContent = "—";
+      currentActiveEventId = null;
+    }
+
+    function setButtonsEnabled(enabled) {
+      btnCreateDraft.disabled = !enabled;
+      btnActivate.disabled = !enabled;
+      btnEnd.disabled = !enabled;
+    }
+
+    function toISOFromDatetimeLocal(v) {
+      // datetime-local returns "YYYY-MM-DDTHH:mm" (no timezone). JS interprets it as local time.
+      if (!v || typeof v !== "string") return null;
+      const d = new Date(v);
+      if (Number.isNaN(d.getTime())) return null;
+      return d.toISOString();
+    }
+
+    async function getAccessTokenOrNull() {
+      const { data: { session } } = await sb.auth.getSession();
+      return session?.access_token || null;
+    }
+
+    async function callAdminEvents(payload) {
+      const token = await getAccessTokenOrNull();
+      if (!token) {
+        throw new Error("No session. Please log in.");
+      }
+
+      const res = await fetch(ADMIN_EVENTS_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const text = await res.text();
+      let data = null;
+      try { data = JSON.parse(text); } catch (_) { /* ignore */ }
+
+      if (!res.ok) {
+        const msg = data?.error || text || `HTTP ${res.status}`;
+        throw new Error(msg);
+      }
+      return data;
     }
 
     // ============ AUTH ============
@@ -289,6 +457,7 @@
       await sb.auth.signOut();
       setSignedInLabel(null);
       resetCards();
+      setButtonsEnabled(false);
       setStatus("Signed out.");
     }
 
@@ -300,7 +469,6 @@
     async function checkOrganizer() {
       setStatus("Gate: checking organizer allowlist…");
 
-      // This will create a visible network request /rpc/is_organizer
       const { data, error } = await sb.rpc("is_organizer");
       if (error) {
         setStatus("Gate error calling is_organizer(): " + error.message, "bad");
@@ -315,11 +483,116 @@
       return true;
     }
 
+    // ============ EVENT MANAGER ACTIONS ============
+    function getEventIdForAction(preferActive=false) {
+      const typed = (em_event_id.value || "").trim();
+      if (preferActive && currentActiveEventId) return currentActiveEventId;
+      return typed || currentActiveEventId || null;
+    }
+
+    async function createDraftEvent() {
+      try {
+        setStatus("Event Manager: creating draft event…");
+
+        const name = (em_name.value || "").trim();
+        if (!name) {
+          setStatus("Event Manager: Event name is required.", "bad");
+          return;
+        }
+
+        const revealISO = toISOFromDatetimeLocal(em_reveal_at.value);
+        const endISO = toISOFromDatetimeLocal(em_end_at.value);
+        if (!revealISO || !endISO) {
+          setStatus("Event Manager: Reveal at and End at are required.", "bad");
+          return;
+        }
+
+        const revealMs = new Date(revealISO).getTime();
+        const endMs = new Date(endISO).getTime();
+        if (!(endMs > revealMs)) {
+          setStatus("Event Manager: End at must be later than Reveal at.", "bad");
+          return;
+        }
+
+        const payload = {
+          action: "create_event",
+          name,
+          timezone: (em_timezone.value || "Australia/Sydney").trim() || "Australia/Sydney",
+          reveal_at: revealISO,
+          end_at: endISO,
+          location_name: (em_location_name.value || "").trim() || null,
+          location_address: (em_location_address.value || "").trim() || null,
+          maps_url: (em_maps_url.value || "").trim() || null
+        };
+
+        const resp = await callAdminEvents(payload);
+        const createdId = resp?.event?.id || null;
+
+        if (createdId) {
+          em_event_id.value = createdId;
+          setStatus(`Event Manager: Draft created ✅ id=${createdId}`, "good");
+        } else {
+          setStatus("Event Manager: Draft created ✅ (no id returned)", "good");
+        }
+
+        await gateAndLoad();
+      } catch (e) {
+        setStatus("Event Manager error: " + (e.message || String(e)), "bad");
+      }
+    }
+
+    async function activateEvent() {
+      try {
+        const eventId = getEventIdForAction(false);
+        if (!eventId) {
+          setStatus("Event Manager: No event_id available to activate. Create a draft first.", "bad");
+          return;
+        }
+
+        setStatus("Event Manager: activating event…");
+        const resp = await callAdminEvents({
+          action: "set_status",
+          event_id: eventId,
+          status: "active"
+        });
+
+        setStatus(`Event Manager: Activated ✅ id=${resp?.event?.id || eventId}`, "good");
+        await gateAndLoad();
+      } catch (e) {
+        setStatus("Event Manager error: " + (e.message || String(e)), "bad");
+      }
+    }
+
+    async function endActiveEvent() {
+      try {
+        const eventId = getEventIdForAction(true);
+        if (!eventId) {
+          setStatus("Event Manager: No active event to end (and no event_id entered).", "bad");
+          return;
+        }
+
+        setStatus("Event Manager: ending active event…");
+        const resp = await callAdminEvents({
+          action: "set_status",
+          event_id: eventId,
+          status: "ended"
+        });
+
+        setStatus(`Event Manager: Ended ✅ id=${resp?.event?.id || eventId}`, "good");
+        await gateAndLoad();
+      } catch (e) {
+        setStatus("Event Manager error: " + (e.message || String(e)), "bad");
+      }
+    }
+
+    btnCreateDraft.addEventListener("click", createDraftEvent);
+    btnActivate.addEventListener("click", activateEvent);
+    btnEnd.addEventListener("click", endActiveEvent);
+
     // ============ DASHBOARD LOAD ============
     async function loadDashboard() {
       setStatus("Dashboard: loading…");
 
-      // Active event
       const evRes = await sb.from("events")
         .select("id,name,status,reveal_at,end_at,timezone,created_at")
         .eq("status", "active")
@@ -333,6 +606,7 @@
 
       const ev = evRes.data?.[0] || null;
       if (!ev) {
+        currentActiveEventId = null;
         evName.textContent = "No active event";
         evMeta.textContent = "—";
         regTotal.textContent = "—";
@@ -343,8 +617,9 @@
         return;
       }
 
+      currentActiveEventId = ev.id;
       evName.textContent = ev.name || "(unnamed)";
-      evMeta.textContent = `status=${ev.status} | reveal_at=${ev.reveal_at} | end_at=${ev.end_at} | tz=${ev.timezone}`;
+      evMeta.textContent = `id=${ev.id} | status=${ev.status} | reveal_at=${ev.reveal_at} | end_at=${ev.end_at} | tz=${ev.timezone}`;
 
       // Registrations counts
       const regRes = await sb.from("registrations")
@@ -363,13 +638,12 @@
       regTotal.textContent = `${total} total`;
       regMeta.textContent = `revealed=${revealed} | pending=${pending}`;
 
-      // Email logs counts (best-effort: if table exists)
+      // Email logs counts (best-effort)
       const logRes = await sb.from("email_logs")
         .select("id, metadata", { count: "exact" })
         .eq("metadata->>event_id", ev.id);
 
       if (logRes.error) {
-        // Don’t fail the whole dashboard if logs table policy/table differs
         logTotal.textContent = "—";
         logMeta.textContent = "email_logs not accessible";
         setStatus("Dashboard loaded (email_logs not accessible): " + logRes.error.message, "good");
@@ -390,29 +664,35 @@
       setSignedInLabel(session);
 
       if (!session) {
+        setButtonsEnabled(false);
         setStatus("No session. Please log in.");
         return;
       }
 
       const ok = await checkOrganizer();
-      if (!ok) return;
+      if (!ok) {
+        setButtonsEnabled(false);
+        return;
+      }
 
+      setButtonsEnabled(true);
       await loadDashboard();
     }
 
     // ============ BOOT ============
     (async () => {
+      setButtonsEnabled(false);
       setStatus("Boot: waiting for auth…");
       const { data: { session } } = await sb.auth.getSession();
       setSignedInLabel(session);
 
-      // Use auth state change to avoid race conditions / infinite fetching
       sb.auth.onAuthStateChange((_event, session2) => {
         setSignedInLabel(session2);
         if (session2) {
           gateAndLoad();
         } else {
           resetCards();
+          setButtonsEnabled(false);
           setStatus("Signed out.");
         }
       });
