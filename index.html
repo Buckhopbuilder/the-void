@@ -186,7 +186,9 @@
     }
 
     .hidden { display: none !important; }
-  </style>
+  
+  .hint{font-size:12px; opacity:.7; margin-top:6px}
+</style>
 </head>
 
 <body>
@@ -215,6 +217,15 @@
           <div class="field">
             <label for="email">Email</label>
             <input id="email" name="email" type="email" placeholder="you@example.com" required />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field full">
+            <label for="phone">Phone (optional)</label>
+            <input id="phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"
+                   placeholder="+61 4xx xxx xxx (include country code)" />
+            <div class="hint">Optional. If provided, we can send your reveal by SMS as well.</div>
           </div>
         </div>
 
@@ -304,6 +315,24 @@
       badMsg.textContent = message;
     }
 
+        function normalizePhoneE164(raw) {
+      // Optional field.
+      // We ONLY accept E.164 (starts with + and digits). No guessing country.
+      if (!raw) return null;
+      const s = String(raw).trim();
+      if (!s) return null;
+
+      // remove common formatting
+      const cleaned = s.replace(/[\s\-().]/g, "");
+
+      if (!cleaned.startsWith("+")) return null;
+
+      // keep + then digits only
+      const digits = "+" + cleaned.slice(1).replace(/\D/g, "");
+      if (digits.length < 9 || digits.length > 16) return null; // E.164 max is 15 digits + plus
+      return digits;
+    }
+
     function regKeyFor(eventId) {
       return `voidpass_registered_${eventId}`;
     }
@@ -320,8 +349,10 @@
 
       const nameField = document.getElementById("name")?.closest(".field");
       const emailField = document.getElementById("email")?.closest(".field");
+      const phoneField = document.getElementById("phone")?.closest(".field");
       if (nameField) nameField.classList.add("hidden");
       if (emailField) emailField.classList.add("hidden");
+      if (phoneField) phoneField.classList.add("hidden");
 
       okMsg.style.display = "block";
     }
@@ -331,8 +362,10 @@
 
       const nameField = document.getElementById("name")?.closest(".field");
       const emailField = document.getElementById("email")?.closest(".field");
+      const phoneField = document.getElementById("phone")?.closest(".field");
       if (nameField) nameField.classList.remove("hidden");
       if (emailField) emailField.classList.remove("hidden");
+      if (phoneField) phoneField.classList.remove("hidden");
     }
 
 
@@ -450,7 +483,15 @@
 
       setBusy(true);
       try {
-        const payload = { full_name: name, email };
+        const phoneRaw = document.getElementById("phone")?.value?.trim() || "";
+        const phone_e164 = normalizePhoneE164(phoneRaw);
+
+        if (phoneRaw && !phone_e164) {
+          setBad("Phone number must include country code, e.g. +61... or +63...");
+          return;
+        }
+
+        const payload = { full_name: name, email, phone_e164 };
         const r = await fetch(REGISTER_FN, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
