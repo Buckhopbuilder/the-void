@@ -198,6 +198,73 @@
       .pill{ max-width: 34ch; }
       .formgrid{ grid-template-columns: 1fr; }
     }
+
+    /* Registrations table */
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      overflow:hidden;
+      border:1px solid var(--line);
+      border-radius:14px;
+      background:rgba(0,0,0,0.14);
+    }
+    th, td{
+      padding:10px 10px;
+      border-bottom:1px solid var(--line);
+      font-size:13px;
+      vertical-align:top;
+    }
+    th{
+      text-align:left;
+      font-size:12px;
+      letter-spacing:0.10em;
+      text-transform:uppercase;
+      color:var(--muted);
+      background:rgba(255,255,255,0.05);
+      position:sticky;
+      top:0;
+      z-index:1;
+    }
+    tr:last-child td{ border-bottom:0; }
+    .tag{
+      display:inline-block;
+      padding:3px 8px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.06);
+      color:var(--muted);
+      font-size:12px;
+      margin-right:6px;
+      white-space:nowrap;
+    }
+    .tag.good{ color:var(--good); border-color:rgba(120,255,180,0.40); }
+    .tag.bad{ color:var(--bad); border-color:rgba(255,130,150,0.40); }
+    .scrollbox{
+      max-height:420px;
+      overflow:auto;
+      border-radius:14px;
+    }
+    .controls{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+      margin-top:10px;
+      margin-bottom:10px;
+    }
+    .controls select, .controls input{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px solid var(--line);
+      background:rgba(255,255,255,0.06);
+      color:var(--text);
+      outline:none;
+    }
+    .controls input{
+      min-width: 260px;
+      flex:1;
+    }
   </style>
 </head>
 
@@ -306,7 +373,7 @@
               <label>Hard capacity (venue limit)</label>
               <input id="em_hard_capacity" type="number" min="1" placeholder="e.g. 300" class="mono" />
             </div>
-</div>
+          </div>
 
           <div class="actions">
             <button id="btnCreateDraft" type="button">Create Draft Event</button>
@@ -319,6 +386,44 @@
             If you already have an active event and want to stop it, click <span class="mono">End Active Event</span>.
           </div>
         </div>
+
+        <!-- NEW: Registrations Viewer -->
+        <div class="card span2" id="regsCard">
+          <h3>Registrations Viewer</h3>
+          <div class="muted tiny">
+            Read-only. Uses <span class="mono">registrations</span> columns:
+            <span class="mono">full_name</span>, <span class="mono">email</span>, <span class="mono">phone_e164</span>,
+            <span class="mono">is_vip</span>, <span class="mono">is_comp</span>, <span class="mono">created_at</span>,
+            <span class="mono">revealed_at</span>, <span class="mono">checked_in_at</span>.
+          </div>
+
+          <div class="controls">
+            <select id="rv_event"></select>
+            <input id="rv_search" type="text" placeholder="Search name / email / phone…" />
+            <button id="btnLoadRegs" type="button">Load</button>
+          </div>
+
+          <div class="muted tiny" id="rv_meta">—</div>
+          <div style="height:10px"></div>
+
+          <div class="scrollbox">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width:26%">Person</th>
+                  <th style="width:22%">Contact</th>
+                  <th style="width:16%">Flags</th>
+                  <th style="width:18%">Registered</th>
+                  <th style="width:18%">State</th>
+                </tr>
+              </thead>
+              <tbody id="rv_tbody">
+                <tr><td colspan="5" class="muted">No data loaded.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
       </div>
     </div>
   </div>
@@ -351,6 +456,14 @@
     const logTotal = el("logTotal");
     const logMeta = el("logMeta");
 
+    // Registrations Viewer elements
+    const rv_event = el("rv_event");
+    const rv_search = el("rv_search");
+    const btnLoadRegs = el("btnLoadRegs");
+    const rv_tbody = el("rv_tbody");
+    const rv_meta = el("rv_meta");
+
+
     // Event Manager elements
     const em_event_id = el("em_event_id");
     const em_name = el("em_name");
@@ -362,7 +475,7 @@
     const em_maps_url = el("em_maps_url");
 
     const em_hard_capacity = el("em_hard_capacity");
-const btnCreateDraft = el("btnCreateDraft");
+    const btnCreateDraft = el("btnCreateDraft");
     const btnActivate = el("btnActivate");
     const btnEnd = el("btnEnd");
 
@@ -395,6 +508,9 @@ const btnCreateDraft = el("btnCreateDraft");
       btnCreateDraft.disabled = !enabled;
       btnActivate.disabled = !enabled;
       btnEnd.disabled = !enabled;
+      btnLoadRegs.disabled = !enabled;
+      rv_event.disabled = !enabled;
+      rv_search.disabled = !enabled;
     }
 
     function toISOFromDatetimeLocal(v) {
@@ -521,20 +637,10 @@ const btnCreateDraft = el("btnCreateDraft");
         }
 
         const hard_capacity = Number((em_hard_capacity.value || "").trim());
-
-
         if (!Number.isInteger(hard_capacity) || hard_capacity <= 0) {
-
-
           setStatus("Event Manager: Hard capacity must be a positive number.", "bad");
-
-
           return;
-
-
         }
-
-
 
         const payload = {
           action: "create_event",
@@ -612,6 +718,156 @@ const btnCreateDraft = el("btnCreateDraft");
     btnActivate.addEventListener("click", activateEvent);
     btnEnd.addEventListener("click", endActiveEvent);
 
+    // ============ REGISTRATIONS VIEWER ============
+    function fmtIso(iso) {
+      if (!iso) return "—";
+      try {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return String(iso);
+        return d.toLocaleString();
+      } catch (_) {
+        return String(iso);
+      }
+    }
+
+    function safeText(v) {
+      if (v === null || v === undefined) return "";
+      return String(v);
+    }
+
+    function setRegsMeta(text) {
+      rv_meta.textContent = text || "—";
+    }
+
+    function setRegsTableLoading() {
+      rv_tbody.innerHTML = `<tr><td colspan="5" class="muted">Loading…</td></tr>`;
+    }
+
+    function setRegsTableEmpty(msg) {
+      rv_tbody.innerHTML = `<tr><td colspan="5" class="muted">${msg || "No rows."}</td></tr>`;
+    }
+
+    function buildTag(label, kind="") {
+      const cls = kind ? `tag ${kind}` : "tag";
+      return `<span class="${cls}">${label}</span>`;
+    }
+
+    function renderRegistrations(rows) {
+      if (!rows || rows.length === 0) {
+        setRegsTableEmpty("No registrations found.");
+        return;
+      }
+
+      const htmlRows = rows.map(r => {
+        const person = `<div><div class="mono" style="font-weight:700">${safeText(r.full_name) || "—"}</div></div>`;
+        const contact = `
+          <div class="mono" style="line-height:1.35">
+            <div>${safeText(r.email) || "—"}</div>
+            <div>${safeText(r.phone_e164) || "—"}</div>
+          </div>
+        `;
+
+        const flags = [
+          r.is_vip ? buildTag("VIP", "good") : "",
+          r.is_comp ? buildTag("COMP", "good") : ""
+        ].filter(Boolean).join("");
+
+        const registered = `<div class="mono">${fmtIso(r.created_at)}</div>`;
+
+        const stateTags = [
+          r.revealed_at ? buildTag("REVEALED", "good") : buildTag("PENDING", "bad"),
+          r.checked_in_at ? buildTag("CHECKED IN", "good") : buildTag("NOT IN", "bad"),
+        ].join("");
+
+        const state = `
+          <div class="mono" style="line-height:1.35">
+            <div>${stateTags}</div>
+            <div class="muted" style="margin-top:6px">
+              revealed_at=${r.revealed_at ? fmtIso(r.revealed_at) : "—"}<br/>
+              checked_in_at=${r.checked_in_at ? fmtIso(r.checked_in_at) : "—"}
+            </div>
+          </div>
+        `;
+
+        return `<tr>
+          <td>${person}</td>
+          <td>${contact}</td>
+          <td>${flags || "<span class='muted'>—</span>"}</td>
+          <td>${registered}</td>
+          <td>${state}</td>
+        </tr>`;
+      }).join("");
+
+      rv_tbody.innerHTML = htmlRows;
+    }
+
+    async function loadEventOptions() {
+      const evRes = await sb.from("events")
+        .select("id,name,status,created_at")
+        .order("created_at", { ascending: false })
+        .limit(25);
+
+      if (evRes.error) {
+        setRegsMeta("Could not load events: " + evRes.error.message);
+        rv_event.innerHTML = `<option value="">(events unavailable)</option>`;
+        return;
+      }
+
+      const events = evRes.data || [];
+      if (events.length === 0) {
+        rv_event.innerHTML = `<option value="">(no events)</option>`;
+        setRegsMeta("No events found.");
+        return;
+      }
+
+      rv_event.innerHTML = events.map(e => {
+        const label = `${e.name || "(unnamed)"} — ${e.status || "?"} — ${e.id}`;
+        return `<option value="${e.id}">${label}</option>`;
+      }).join("");
+
+      if (currentActiveEventId) rv_event.value = currentActiveEventId;
+      setRegsMeta("Select an event then click Load.");
+    }
+
+    async function loadRegistrationsForSelectedEvent() {
+      const eventId = (rv_event.value || "").trim();
+      if (!eventId) {
+        setRegsTableEmpty("No event selected.");
+        return;
+      }
+
+      setRegsTableLoading();
+
+      const { data, error, count } = await sb
+        .from("registrations")
+        .select("id,full_name,email,phone_e164,is_vip,is_comp,created_at,revealed_at,checked_in_at", { count: "exact" })
+        .eq("event_id", eventId)
+        .order("created_at", { ascending: false })
+        .limit(500);
+
+      if (error) {
+        setRegsTableEmpty("Error loading registrations: " + error.message);
+        return;
+      }
+
+      const rows = data || [];
+      const q = (rv_search.value || "").trim().toLowerCase();
+      const filtered = q
+        ? rows.filter(r => {
+            const hay = `${safeText(r.full_name)} ${safeText(r.email)} ${safeText(r.phone_e164)}`.toLowerCase();
+            return hay.includes(q);
+          })
+        : rows;
+
+      setRegsMeta(`event_id=${eventId} | total=${count ?? rows.length} | showing=${filtered.length}`);
+      renderRegistrations(filtered);
+    }
+
+    btnLoadRegs.addEventListener("click", loadRegistrationsForSelectedEvent);
+    rv_search.addEventListener("input", () => {
+      loadRegistrationsForSelectedEvent();
+    });
+
     // ============ DASHBOARD LOAD ============
     async function loadDashboard() {
       setStatus("Dashboard: loading…");
@@ -637,6 +893,7 @@ const btnCreateDraft = el("btnCreateDraft");
         logTotal.textContent = "—";
         logMeta.textContent = "—";
         setStatus("Dashboard loaded: no active event.", "good");
+        await loadEventOptions();
         return;
       }
 
@@ -644,7 +901,6 @@ const btnCreateDraft = el("btnCreateDraft");
       evName.textContent = ev.name || "(unnamed)";
       evMeta.textContent = `id=${ev.id} | status=${ev.status} | reveal_at=${ev.reveal_at} | end_at=${ev.end_at} | tz=${ev.timezone}`;
 
-      // Registrations counts
       const regRes = await sb.from("registrations")
         .select("id,reveal_sent_at", { count: "exact" })
         .eq("event_id", ev.id);
@@ -661,7 +917,6 @@ const btnCreateDraft = el("btnCreateDraft");
       regTotal.textContent = `${total} total`;
       regMeta.textContent = `revealed=${revealed} | pending=${pending}`;
 
-      // Email logs counts (best-effort)
       const logRes = await sb.from("email_logs")
         .select("id, metadata", { count: "exact" })
         .eq("metadata->>event_id", ev.id);
@@ -700,6 +955,7 @@ const btnCreateDraft = el("btnCreateDraft");
 
       setButtonsEnabled(true);
       await loadDashboard();
+      await loadEventOptions();
     }
 
     // ============ BOOT ============
