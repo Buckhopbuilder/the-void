@@ -318,7 +318,7 @@
           </div>
         </div>
 
-        <!-- NEW: Event Manager -->
+        <!-- Event Manager (existing) -->
         <div class="card span2" id="eventManagerCard">
           <h3>Event Manager</h3>
           <div class="muted tiny">
@@ -368,7 +368,7 @@
               <label>Maps URL (maps_url)</label>
               <input id="em_maps_url" type="url" placeholder="https://maps.app.goo.gl/..." class="mono" />
             </div>
-          
+
             <div class="field full">
               <label>Hard capacity (venue limit)</label>
               <input id="em_hard_capacity" type="number" min="1" placeholder="e.g. 300" class="mono" />
@@ -387,14 +387,15 @@
           </div>
         </div>
 
-        <!-- NEW: Registrations Viewer -->
+        <!-- Registrations Viewer (updated to match schema) -->
         <div class="card span2" id="regsCard">
           <h3>Registrations Viewer</h3>
           <div class="muted tiny">
             Read-only. Uses <span class="mono">registrations</span> columns:
             <span class="mono">full_name</span>, <span class="mono">email</span>, <span class="mono">phone_e164</span>,
-            <span class="mono">is_vip</span>, <span class="mono">is_comp</span>, <span class="mono">created_at</span>,
-            <span class="mono">revealed_at</span>, <span class="mono">checked_in_at</span>.
+            <span class="mono">guest_count</span>, <span class="mono">entries_remaining</span>,
+            <span class="mono">entry_type</span>, <span class="mono">entry_status</span>,
+            <span class="mono">created_at</span>, <span class="mono">reveal_sent_at</span>, <span class="mono">last_checkin_at</span>.
           </div>
 
           <div class="controls">
@@ -412,9 +413,9 @@
                 <tr>
                   <th style="width:26%">Person</th>
                   <th style="width:22%">Contact</th>
-                  <th style="width:16%">Flags</th>
-                  <th style="width:18%">Registered</th>
-                  <th style="width:18%">State</th>
+                  <th style="width:22%">Entry</th>
+                  <th style="width:14%">Registered</th>
+                  <th style="width:16%">State</th>
                 </tr>
               </thead>
               <tbody id="rv_tbody">
@@ -428,19 +429,15 @@
     </div>
   </div>
 
-  <!-- Supabase JS (UMD build) -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 
   <script>
-    // ============ CONFIG ============
     const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
     const ADMIN_EVENTS_URL = `${SUPABASE_URL}/functions/v1/admin_events`;
 
-    // ============ CLIENT ============
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // ============ UI ============
     const el = (id) => document.getElementById(id);
     const who = el("who");
     const statusEl = el("status");
@@ -456,15 +453,12 @@
     const logTotal = el("logTotal");
     const logMeta = el("logMeta");
 
-    // Registrations Viewer elements
     const rv_event = el("rv_event");
     const rv_search = el("rv_search");
     const btnLoadRegs = el("btnLoadRegs");
     const rv_tbody = el("rv_tbody");
     const rv_meta = el("rv_meta");
 
-
-    // Event Manager elements
     const em_event_id = el("em_event_id");
     const em_name = el("em_name");
     const em_timezone = el("em_timezone");
@@ -473,13 +467,11 @@
     const em_location_name = el("em_location_name");
     const em_location_address = el("em_location_address");
     const em_maps_url = el("em_maps_url");
-
     const em_hard_capacity = el("em_hard_capacity");
     const btnCreateDraft = el("btnCreateDraft");
     const btnActivate = el("btnActivate");
     const btnEnd = el("btnEnd");
 
-    // State
     let currentActiveEventId = null;
 
     function setStatus(msg, kind="") {
@@ -514,7 +506,6 @@
     }
 
     function toISOFromDatetimeLocal(v) {
-      // datetime-local returns "YYYY-MM-DDTHH:mm" (no timezone). JS interprets it as local time.
       if (!v || typeof v !== "string") return null;
       const d = new Date(v);
       if (Number.isNaN(d.getTime())) return null;
@@ -528,9 +519,7 @@
 
     async function callAdminEvents(payload) {
       const token = await getAccessTokenOrNull();
-      if (!token) {
-        throw new Error("No session. Please log in.");
-      }
+      if (!token) throw new Error("No session. Please log in.");
 
       const res = await fetch(ADMIN_EVENTS_URL, {
         method: "POST",
@@ -543,7 +532,7 @@
 
       const text = await res.text();
       let data = null;
-      try { data = JSON.parse(text); } catch (_) { /* ignore */ }
+      try { data = JSON.parse(text); } catch (_) {}
 
       if (!res.ok) {
         const msg = data?.error || text || `HTTP ${res.status}`;
@@ -552,7 +541,6 @@
       return data;
     }
 
-    // ============ AUTH ============
     async function doLogin() {
       const email = el("email").value.trim();
       const password = el("password").value;
@@ -587,10 +575,8 @@
     btnLogout.addEventListener("click", doLogout);
     btnRefresh.addEventListener("click", gateAndLoad);
 
-    // ============ ORG GATE ============
     async function checkOrganizer() {
       setStatus("Gate: checking organizer allowlist…");
-
       const { data, error } = await sb.rpc("is_organizer");
       if (error) {
         setStatus("Gate error calling is_organizer(): " + error.message, "bad");
@@ -600,12 +586,10 @@
         setStatus("Organizer access required (not allowlisted).", "bad");
         return false;
       }
-
       setStatus("Gate: organizer confirmed ✅", "good");
       return true;
     }
 
-    // ============ EVENT MANAGER ACTIONS ============
     function getEventIdForAction(preferActive=false) {
       const typed = (em_event_id.value || "").trim();
       if (preferActive && currentActiveEventId) return currentActiveEventId;
@@ -617,21 +601,12 @@
         setStatus("Event Manager: creating draft event…");
 
         const name = (em_name.value || "").trim();
-        if (!name) {
-          setStatus("Event Manager: Event name is required.", "bad");
-          return;
-        }
+        if (!name) { setStatus("Event Manager: Event name is required.", "bad"); return; }
 
         const revealISO = toISOFromDatetimeLocal(em_reveal_at.value);
         const endISO = toISOFromDatetimeLocal(em_end_at.value);
-        if (!revealISO || !endISO) {
-          setStatus("Event Manager: Reveal at and End at are required.", "bad");
-          return;
-        }
-
-        const revealMs = new Date(revealISO).getTime();
-        const endMs = new Date(endISO).getTime();
-        if (!(endMs > revealMs)) {
+        if (!revealISO || !endISO) { setStatus("Event Manager: Reveal at and End at are required.", "bad"); return; }
+        if (!(new Date(endISO).getTime() > new Date(revealISO).getTime())) {
           setStatus("Event Manager: End at must be later than Reveal at.", "bad");
           return;
         }
@@ -656,14 +631,9 @@
 
         const resp = await callAdminEvents(payload);
         const createdId = resp?.event?.id || null;
+        if (createdId) em_event_id.value = createdId;
 
-        if (createdId) {
-          em_event_id.value = createdId;
-          setStatus(`Event Manager: Draft created ✅ id=${createdId}`, "good");
-        } else {
-          setStatus("Event Manager: Draft created ✅ (no id returned)", "good");
-        }
-
+        setStatus(createdId ? `Event Manager: Draft created ✅ id=${createdId}` : "Event Manager: Draft created ✅", "good");
         await gateAndLoad();
       } catch (e) {
         setStatus("Event Manager error: " + (e.message || String(e)), "bad");
@@ -673,18 +643,9 @@
     async function activateEvent() {
       try {
         const eventId = getEventIdForAction(false);
-        if (!eventId) {
-          setStatus("Event Manager: No event_id available to activate. Create a draft first.", "bad");
-          return;
-        }
-
+        if (!eventId) { setStatus("Event Manager: No event_id available to activate. Create a draft first.", "bad"); return; }
         setStatus("Event Manager: activating event…");
-        const resp = await callAdminEvents({
-          action: "set_status",
-          event_id: eventId,
-          status: "active"
-        });
-
+        const resp = await callAdminEvents({ action: "set_status", event_id: eventId, status: "active" });
         setStatus(`Event Manager: Activated ✅ id=${resp?.event?.id || eventId}`, "good");
         await gateAndLoad();
       } catch (e) {
@@ -695,18 +656,9 @@
     async function endActiveEvent() {
       try {
         const eventId = getEventIdForAction(true);
-        if (!eventId) {
-          setStatus("Event Manager: No active event to end (and no event_id entered).", "bad");
-          return;
-        }
-
+        if (!eventId) { setStatus("Event Manager: No active event to end (and no event_id entered).", "bad"); return; }
         setStatus("Event Manager: ending active event…");
-        const resp = await callAdminEvents({
-          action: "set_status",
-          event_id: eventId,
-          status: "ended"
-        });
-
+        const resp = await callAdminEvents({ action: "set_status", event_id: eventId, status: "ended" });
         setStatus(`Event Manager: Ended ✅ id=${resp?.event?.id || eventId}`, "good");
         await gateAndLoad();
       } catch (e) {
@@ -718,7 +670,7 @@
     btnActivate.addEventListener("click", activateEvent);
     btnEnd.addEventListener("click", endActiveEvent);
 
-    // ============ REGISTRATIONS VIEWER ============
+    // Registrations Viewer
     function fmtIso(iso) {
       if (!iso) return "—";
       try {
@@ -729,34 +681,20 @@
         return String(iso);
       }
     }
-
     function safeText(v) {
       if (v === null || v === undefined) return "";
       return String(v);
     }
-
-    function setRegsMeta(text) {
-      rv_meta.textContent = text || "—";
-    }
-
-    function setRegsTableLoading() {
-      rv_tbody.innerHTML = `<tr><td colspan="5" class="muted">Loading…</td></tr>`;
-    }
-
-    function setRegsTableEmpty(msg) {
-      rv_tbody.innerHTML = `<tr><td colspan="5" class="muted">${msg || "No rows."}</td></tr>`;
-    }
-
+    function setRegsMeta(text) { rv_meta.textContent = text || "—"; }
+    function setRegsTableLoading() { rv_tbody.innerHTML = `<tr><td colspan="5" class="muted">Loading…</td></tr>`; }
+    function setRegsTableEmpty(msg) { rv_tbody.innerHTML = `<tr><td colspan="5" class="muted">${msg || "No rows."}</td></tr>`; }
     function buildTag(label, kind="") {
       const cls = kind ? `tag ${kind}` : "tag";
       return `<span class="${cls}">${label}</span>`;
     }
 
     function renderRegistrations(rows) {
-      if (!rows || rows.length === 0) {
-        setRegsTableEmpty("No registrations found.");
-        return;
-      }
+      if (!rows || rows.length === 0) { setRegsTableEmpty("No registrations found."); return; }
 
       const htmlRows = rows.map(r => {
         const person = `<div><div class="mono" style="font-weight:700">${safeText(r.full_name) || "—"}</div></div>`;
@@ -767,24 +705,34 @@
           </div>
         `;
 
-        const flags = [
-          r.is_vip ? buildTag("VIP", "good") : "",
-          r.is_comp ? buildTag("COMP", "good") : ""
+        const entryTags = [
+          r.entry_type ? buildTag(String(r.entry_type).toUpperCase(), "good") : "",
+          r.entry_status ? buildTag(String(r.entry_status).toUpperCase()) : "",
         ].filter(Boolean).join("");
+
+        const entryMeta = `
+          <div class="mono" style="line-height:1.35">
+            <div>${entryTags || "<span class='muted'>—</span>"}</div>
+            <div class="muted" style="margin-top:6px">
+              guest_count=${r.guest_count ?? "—"}<br/>
+              entries_remaining=${r.entries_remaining ?? "—"}
+            </div>
+          </div>
+        `;
 
         const registered = `<div class="mono">${fmtIso(r.created_at)}</div>`;
 
         const stateTags = [
-          r.revealed_at ? buildTag("REVEALED", "good") : buildTag("PENDING", "bad"),
-          r.checked_in_at ? buildTag("CHECKED IN", "good") : buildTag("NOT IN", "bad"),
+          r.reveal_sent_at ? buildTag("REVEAL SENT", "good") : buildTag("REVEAL PENDING", "bad"),
+          r.last_checkin_at ? buildTag("CHECKED IN", "good") : buildTag("NOT IN", "bad"),
         ].join("");
 
         const state = `
           <div class="mono" style="line-height:1.35">
             <div>${stateTags}</div>
             <div class="muted" style="margin-top:6px">
-              revealed_at=${r.revealed_at ? fmtIso(r.revealed_at) : "—"}<br/>
-              checked_in_at=${r.checked_in_at ? fmtIso(r.checked_in_at) : "—"}
+              reveal_sent_at=${r.reveal_sent_at ? fmtIso(r.reveal_sent_at) : "—"}<br/>
+              last_checkin_at=${r.last_checkin_at ? fmtIso(r.last_checkin_at) : "—"}
             </div>
           </div>
         `;
@@ -792,7 +740,7 @@
         return `<tr>
           <td>${person}</td>
           <td>${contact}</td>
-          <td>${flags || "<span class='muted'>—</span>"}</td>
+          <td>${entryMeta}</td>
           <td>${registered}</td>
           <td>${state}</td>
         </tr>`;
@@ -831,24 +779,18 @@
 
     async function loadRegistrationsForSelectedEvent() {
       const eventId = (rv_event.value || "").trim();
-      if (!eventId) {
-        setRegsTableEmpty("No event selected.");
-        return;
-      }
+      if (!eventId) { setRegsTableEmpty("No event selected."); return; }
 
       setRegsTableLoading();
 
       const { data, error, count } = await sb
         .from("registrations")
-        .select("id,full_name,email,phone_e164,is_vip,is_comp,created_at,revealed_at,checked_in_at", { count: "exact" })
+        .select("id,full_name,email,phone_e164,guest_count,entries_remaining,entry_type,entry_status,created_at,reveal_sent_at,last_checkin_at", { count: "exact" })
         .eq("event_id", eventId)
         .order("created_at", { ascending: false })
         .limit(500);
 
-      if (error) {
-        setRegsTableEmpty("Error loading registrations: " + error.message);
-        return;
-      }
+      if (error) { setRegsTableEmpty("Error loading registrations: " + error.message); return; }
 
       const rows = data || [];
       const q = (rv_search.value || "").trim().toLowerCase();
@@ -864,11 +806,8 @@
     }
 
     btnLoadRegs.addEventListener("click", loadRegistrationsForSelectedEvent);
-    rv_search.addEventListener("input", () => {
-      loadRegistrationsForSelectedEvent();
-    });
+    rv_search.addEventListener("input", () => { loadRegistrationsForSelectedEvent(); });
 
-    // ============ DASHBOARD LOAD ============
     async function loadDashboard() {
       setStatus("Dashboard: loading…");
 
@@ -878,10 +817,7 @@
         .order("created_at", { ascending: false })
         .limit(1);
 
-      if (evRes.error) {
-        setStatus("Dashboard error (events): " + evRes.error.message, "bad");
-        return;
-      }
+      if (evRes.error) { setStatus("Dashboard error (events): " + evRes.error.message, "bad"); return; }
 
       const ev = evRes.data?.[0] || null;
       if (!ev) {
@@ -905,17 +841,14 @@
         .select("id,reveal_sent_at", { count: "exact" })
         .eq("event_id", ev.id);
 
-      if (regRes.error) {
-        setStatus("Dashboard error (registrations): " + regRes.error.message, "bad");
-        return;
-      }
+      if (regRes.error) { setStatus("Dashboard error (registrations): " + regRes.error.message, "bad"); return; }
 
       const total = regRes.count ?? (regRes.data?.length ?? 0);
       const revealed = (regRes.data || []).filter(r => r.reveal_sent_at != null).length;
       const pending = total - revealed;
 
       regTotal.textContent = `${total} total`;
-      regMeta.textContent = `revealed=${revealed} | pending=${pending}`;
+      regMeta.textContent = `reveal_sent=${revealed} | pending=${pending}`;
 
       const logRes = await sb.from("email_logs")
         .select("id, metadata", { count: "exact" })
@@ -941,24 +874,16 @@
       const { data: { session } } = await sb.auth.getSession();
       setSignedInLabel(session);
 
-      if (!session) {
-        setButtonsEnabled(false);
-        setStatus("No session. Please log in.");
-        return;
-      }
+      if (!session) { setButtonsEnabled(false); setStatus("No session. Please log in."); return; }
 
       const ok = await checkOrganizer();
-      if (!ok) {
-        setButtonsEnabled(false);
-        return;
-      }
+      if (!ok) { setButtonsEnabled(false); return; }
 
       setButtonsEnabled(true);
       await loadDashboard();
       await loadEventOptions();
     }
 
-    // ============ BOOT ============
     (async () => {
       setButtonsEnabled(false);
       setStatus("Boot: waiting for auth…");
@@ -967,20 +892,12 @@
 
       sb.auth.onAuthStateChange((_event, session2) => {
         setSignedInLabel(session2);
-        if (session2) {
-          gateAndLoad();
-        } else {
-          resetCards();
-          setButtonsEnabled(false);
-          setStatus("Signed out.");
-        }
+        if (session2) gateAndLoad();
+        else { resetCards(); setButtonsEnabled(false); setStatus("Signed out."); }
       });
 
-      if (session) {
-        await gateAndLoad();
-      } else {
-        setStatus("Not signed in. Enter email + password then Login.");
-      }
+      if (session) await gateAndLoad();
+      else setStatus("Not signed in. Enter email + password then Login.");
     })();
   </script>
 </body>
