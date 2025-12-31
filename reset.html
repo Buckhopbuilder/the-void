@@ -67,6 +67,7 @@
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { detectSessionInUrl: true }
   });
+  window.supabase = supabase;
 
   const statusPill = document.getElementById("statusPill");
   const statusText = document.getElementById("statusText");
