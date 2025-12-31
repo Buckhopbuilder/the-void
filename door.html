@@ -11,24 +11,16 @@
     .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 16px; margin: 12px 0; }
     .row { display:flex; gap: 12px; flex-wrap: wrap; }
     label { display:block; font-size: 12px; opacity: 0.85; margin: 10px 0 6px; }
-    input, select, button {
-      width: 100%;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid rgba(255,255,255,0.10);
-      color: #e6e6e6;
-      border-radius: 12px;
-      padding: 12px;
-      font-size: 14px;
-      outline: none;
-    }
-    button { cursor:pointer; font-weight: 700; }
-    button:disabled { opacity: 0.5; cursor:not-allowed; }
-    .btn { background: rgba(120,255,200,0.10); border-color: rgba(120,255,200,0.25); }
+    input, select { width: 100%; padding: 12px 12px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.10); border-radius: 12px; color: #e6e6e6; outline: none; }
+    button { cursor:pointer; }
+    .btn { width: 100%; padding: 12px; border-radius: 12px; border: 1px solid rgba(120,255,200,0.25); background: rgba(120,255,200,0.10); color:#e6e6e6; font-weight: 700; }
     .btn2 { background: rgba(120,180,255,0.10); border-color: rgba(120,180,255,0.25); }
-    .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; border:1px solid rgba(255,255,255,0.10); background: rgba(255,255,255,0.04); }
-    .ok { border-color: rgba(120,255,200,0.35); background: rgba(120,255,200,0.10); }
-    .bad { border-color: rgba(255,120,120,0.35); background: rgba(255,120,120,0.10); }
-    pre { white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.35); padding: 12px; border-radius: 12px; border:1px solid rgba(255,255,255,0.08); }
+    .secondary { background: rgba(120,180,255,0.10); border-color: rgba(120,180,255,0.25); }
+    .pill { display:inline-block; padding: 6px 10px; border-radius: 999px; font-size: 12px; border: 1px solid rgba(255,255,255,0.10); }
+    .pill.ok { border-color: rgba(120,255,200,0.35); background: rgba(120,255,200,0.10); }
+    .pill.bad { border-color: rgba(255,120,120,0.35); background: rgba(255,120,120,0.10); }
+    pre { white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; margin-top: 12px; }
+    .muted { opacity: .8; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -37,7 +29,7 @@
       <div class="row" style="justify-content: space-between; align-items:center;">
         <div>
           <strong>VOIDPASS DOOR</strong>
-          <div style="opacity:.75;font-size:12px;">Door staff check-in (manual + QR)</div>
+          <div class="muted">Door staff check-in (manual + secondary name search)</div>
         </div>
         <span id="authPill" class="pill bad">Not signed in</span>
       </div>
@@ -48,18 +40,48 @@
       <input id="email" type="email">
       <label>Password</label>
       <input id="password" type="password">
-      <div class="row">
+      <div class="row" style="margin-top:12px;">
         <button id="signIn" class="btn2">Sign in</button>
-        <button id="signOut">Sign out</button>
+        <button id="signOut" class="btn2">Sign out</button>
+      </div>
+      <div id="tool" style="display:none; margin-top:12px;">
+        <div class="muted">You must be signed in as organizer or door staff.</div>
       </div>
     </div>
 
-    <div class="card" id="tool" style="display:none;">
+    <div class="card">
       <label>Guest email</label>
-      <input id="guestEmail" type="email">
+      <input id="guestEmail" type="email" placeholder="Required for manual check-in">
       <label>Full name</label>
-      <input id="guestName" type="text">
-      <button id="checkin" class="btn">Manual check-in</button>
+      <input id="guestName" type="text" placeholder="Required for both flows">
+
+      <div class="row" style="margin-top:12px;">
+        <button id="checkin" class="btn" style="flex:1;">Manual check-in</button>
+        <button id="nameSearch" class="btn secondary" style="flex:1;">Search by name (staff)</button>
+      </div>
+
+      <div id="candidatesBox" class="card" style="display:none; margin-top:14px; padding:14px;">
+        <strong>Name search results</strong>
+        <div class="muted" style="margin-top:6px;">
+          Select a match, then confirm identity. Default confirmation is <b>phone last 4</b>.
+          If no phone was supplied at registration, use <b>email prefix</b>.
+        </div>
+
+        <label style="margin-top:12px;">Candidates</label>
+        <select id="candidateSelect"></select>
+
+        <div id="confirmBox" style="display:none;">
+          <label style="margin-top:12px;">Phone last 4 (preferred)</label>
+          <input id="phoneLast4" type="text" inputmode="numeric" placeholder="e.g. 0123">
+
+          <label>Email prefix (fallback if no phone on file)</label>
+          <input id="emailPrefix" type="text" placeholder="e.g. pv or john.s">
+
+          <button id="confirmCheckin" class="btn" style="margin-top:12px;">Confirm + check-in</button>
+
+          <div id="confirmHint" class="muted" style="margin-top:8px;"></div>
+        </div>
+      </div>
     </div>
 
     <div class="card">
@@ -74,7 +96,7 @@
 
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWEycmVvZmlvbiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM1NjU2NTI2LCJleHAiOjIwODE4MjI5MjZ9.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -107,12 +129,12 @@
       email: email.value,
       password: password.value
     });
-    refresh();
+    await refresh();
   };
 
   document.getElementById("signOut").onclick = async () => {
     await supabase.auth.signOut();
-    refresh();
+    await refresh();
   };
 
   document.getElementById("checkin").onclick = async () => {
@@ -135,6 +157,139 @@
     );
     const json = await res.json();
     showResult(res.ok && json.ok, json);
+  };
+
+  // ----- Secondary flow: name-only search -----
+  const candidatesBox = document.getElementById("candidatesBox");
+  const candidateSelect = document.getElementById("candidateSelect");
+  const confirmBox = document.getElementById("confirmBox");
+  const confirmHint = document.getElementById("confirmHint");
+  const phoneLast4 = document.getElementById("phoneLast4");
+  const emailPrefix = document.getElementById("emailPrefix");
+
+  let lastCandidates = [];
+
+  document.getElementById("nameSearch").onclick = async () => {
+    confirmBox.style.display = "none";
+    confirmHint.textContent = "";
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+
+    const res = await fetch(
+      "https://xhitzrnmowqeaerofion.supabase.co/functions/v1/door_checkin",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          action: "search_by_name",
+          full_name: guestName.value
+        })
+      }
+    );
+
+    const json = await res.json();
+    showResult(res.ok && json.ok, json);
+
+    if (!(res.ok && json.ok)) {
+      candidatesBox.style.display = "none";
+      return;
+    }
+
+    lastCandidates = Array.isArray(json.candidates) ? json.candidates : [];
+    candidatesBox.style.display = "";
+    candidateSelect.innerHTML = "";
+
+    if (!lastCandidates.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No matches";
+      candidateSelect.appendChild(opt);
+      confirmBox.style.display = "none";
+      return;
+    }
+
+    const opt0 = document.createElement("option");
+    opt0.value = "";
+    opt0.textContent = "Select a candidate…";
+    candidateSelect.appendChild(opt0);
+
+    for (let i = 0; i < lastCandidates.length; i++) {
+      const c = lastCandidates[i];
+      const opt = document.createElement("option");
+      opt.value = String(i);
+      const er = c.entries_remaining ?? "?";
+      opt.textContent = `${c.full_name} • ${c.masked_email} • entries:${er}`;
+      candidateSelect.appendChild(opt);
+    }
+  };
+
+  candidateSelect.onchange = () => {
+    const v = candidateSelect.value;
+    if (!v) {
+      confirmBox.style.display = "none";
+      return;
+    }
+    confirmBox.style.display = "";
+    confirmHint.textContent = "Ask for phone last 4. If the guest never provided a phone, use email prefix.";
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    phoneLast4.focus();
+  };
+
+  document.getElementById("confirmCheckin").onclick = async () => {
+    const idx = candidateSelect.value ? Number(candidateSelect.value) : -1;
+    const c = (idx >= 0 && idx < lastCandidates.length) ? lastCandidates[idx] : null;
+    if (!c) {
+      showResult(false, { ok:false, error:"Select a candidate first" });
+      return;
+    }
+
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+
+    const res = await fetch(
+      "https://xhitzrnmowqeaerofion.supabase.co/functions/v1/door_checkin",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          action: "confirm_candidate",
+          registration_id: c.registration_id,
+          event_id: c.event_id,
+          phone_last4: phoneLast4.value,
+          email_prefix: emailPrefix.value,
+          method: "manual"
+        })
+      }
+    );
+
+    const json = await res.json();
+    showResult(res.ok && json.ok, json);
+
+    if (json && json.code === "phone_missing_use_email_prefix") {
+      confirmHint.textContent = "No phone on file. Use email prefix instead.";
+      emailPrefix.focus();
+    } else if (json && json.code === "email_prefix_mismatch") {
+      confirmHint.textContent = "Email prefix mismatch. Try again.";
+      emailPrefix.focus();
+    } else if (json && json.code === "phone_last4_required") {
+      confirmHint.textContent = "Phone last 4 required for this registration.";
+      phoneLast4.focus();
+    } else if (json && json.code === "phone_last4_mismatch") {
+      confirmHint.textContent = "Phone last 4 mismatch. Try again.";
+      phoneLast4.focus();
+    } else {
+      confirmHint.textContent = "";
+    }
   };
 
   refresh();
