@@ -45,7 +45,7 @@
       <button id="goDoor" class="btn2" style="display:none;">Go to Door</button>
 
       <div class="muted" style="margin-top:10px;">
-        If you get “No recovery session”, the email link is arriving without tokens (often due to link rewriting).
+        If you see “Not ready”, the recovery link arrived without usable tokens.
       </div>
     </div>
 
@@ -59,7 +59,6 @@
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  // Match your door.html
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWEycmVvZmlvbiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM1NjU2NTI2LCJleHAiOjIwODE4MjI5MjZ9.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
@@ -67,6 +66,8 @@
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
     auth: { detectSessionInUrl: true }
   });
+
+  // For console inspection only
   window.supabase = supabase;
 
   const statusPill = document.getElementById("statusPill");
@@ -88,78 +89,70 @@
     debug.textContent = JSON.stringify(obj, null, 2);
   }
 
-  function parseUrl() {
+  function parseHash() {
     const u = new URL(window.location.href);
     const hash = new URLSearchParams((u.hash || "").replace(/^#/, ""));
-    const qs = u.searchParams;
-
-    // Common Supabase variants:
-    // 1) ?code=... (PKCE)
-    // 2) ?token_hash=...&type=recovery
-    // 3) #access_token=...&refresh_token=...&type=recovery
     return {
-      has_code: !!qs.get("code"),
-      has_token_hash: !!qs.get("token_hash"),
-      type_qs: qs.get("type") || null,
+      type_hash: hash.get("type") || null,
       has_access_token_hash: !!hash.get("access_token"),
       has_refresh_token_hash: !!hash.get("refresh_token"),
-      type_hash: hash.get("type") || null
+      // do NOT display token values
     };
   }
 
-  async function establishSessionFromUrl() {
+  function parseQuery() {
     const u = new URL(window.location.href);
-    const qs = u.searchParams;
-    const code = qs.get("code");
-    const token_hash = qs.get("token_hash");
-    const type = qs.get("type");
+    return {
+      has_code: !!u.searchParams.get("code"),
+      has_token_hash: !!u.searchParams.get("token_hash"),
+      type_qs: u.searchParams.get("type") || null
+    };
+  }
 
-    // PKCE code exchange
-    if (code) {
-      const { error } = await supabase.auth.exchangeCodeForSession(code);
-      if (error) return { ok:false, stage:"exchangeCodeForSession", error:error.message };
-      return { ok:true, stage:"exchangeCodeForSession" };
+  async function establishSessionIfNeeded() {
+    // If supabase didn't detect it, we force setSession from hash tokens for recovery links
+    const u = new URL(window.location.href);
+    const hash = new URLSearchParams((u.hash || "").replace(/^#/, ""));
+    const type = hash.get("type");
+
+    const access_token = hash.get("access_token");
+    const refresh_token = hash.get("refresh_token");
+
+    if (type === "recovery" && access_token && refresh_token) {
+      const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
+      if (error) return { ok:false, stage:"setSession", error:error.message };
+      return { ok:true, stage:"setSession", data_present: !!data?.session };
     }
 
-    // token_hash verify
-    if (token_hash && type) {
-      const { error } = await supabase.auth.verifyOtp({ token_hash, type });
-      if (error) return { ok:false, stage:"verifyOtp", error:error.message };
-      return { ok:true, stage:"verifyOtp" };
-    }
-
-    // access_token in hash is handled by detectSessionInUrl on init.
-    return { ok:true, stage:"detectSessionInUrl" };
+    return { ok:true, stage:"no_force_needed" };
   }
 
   async function waitForSession() {
-    // Some flows set session asynchronously after init; give it a moment.
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 12; i++) {
       const { data, error } = await supabase.auth.getSession();
-      if (error) return { ok:false, error:error.message };
+      if (error) return { ok:false, stage:"getSession", error:error.message };
       if (data?.session) return { ok:true, session: data.session };
       await new Promise(r => setTimeout(r, 250));
     }
-    return { ok:false, error:"No session detected" };
+    return { ok:false, stage:"waitForSession", error:"No session detected" };
   }
 
   async function main() {
-    const urlInfo = parseUrl();
-    safeDebug({
-      url_tokens_present: urlInfo,
-      note: "If all fields are false/null, you did not arrive here via a valid recovery link (or a link rewriter stripped the params)."
-    });
+    const dbg = { url_tokens_present: { ...parseQuery(), ...parseHash() } };
+    safeDebug(dbg);
 
-    const establish = await establishSessionFromUrl();
-    if (!establish.ok) {
+    // First, try to force session from hash if needed
+    const forced = await establishSessionIfNeeded();
+    if (!forced.ok) {
       setStatus(false, "Recovery link detected but failed to establish session.");
-      safeDebug({ ...parseUrl(), establish_error: establish });
+      safeDebug({ ...dbg, establish_error: forced });
       return;
     }
 
     const got = await waitForSession();
     if (!got.ok) {
-      setStatus(false, "No recovery session found. Open the password reset email link again (not a bookmark).");
+      setStatus(false, "No recovery session found. Click a fresh reset email link (do not copy/paste).");
+      safeDebug({ ...dbg, session_error: got, establish: forced });
       return;
     }
 
@@ -179,7 +172,7 @@
     const { error } = await supabase.auth.updateUser({ password: a });
     if (error) {
       setStatus(false, "Failed to set password.");
-      safeDebug({ update_error: error.message, url_tokens_present: parseUrl() });
+      safeDebug({ ...JSON.parse(debug.textContent || "{}"), update_error: error.message });
       return;
     }
 
