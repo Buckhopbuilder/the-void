@@ -27,52 +27,51 @@
       <div style="display:flex; justify-content: space-between; align-items:center; gap:12px;">
         <div>
           <strong>VOIDPASS — RESET PASSWORD</strong>
-          <div class="muted">This page only works from a Supabase password-recovery link.</div>
+          <div class="muted">Open this page ONLY via the password reset email link.</div>
         </div>
         <span id="statusPill" class="pill bad">Not ready</span>
+      </div>
+      <div class="muted" id="statusText" style="margin-top:10px;">Waiting for recovery token…</div>
+    </div>
+
+    <div class="card" id="formBox" style="display:none;">
+      <label>New password</label>
+      <input id="pw1" type="password" autocomplete="new-password" />
+
+      <label>Confirm new password</label>
+      <input id="pw2" type="password" autocomplete="new-password" />
+
+      <button id="setPw" class="btn" style="margin-top:12px;">Set new password</button>
+      <button id="goDoor" class="btn2" style="display:none;">Go to Door</button>
+
+      <div class="muted" style="margin-top:10px;">
+        If you get “No recovery session”, the email link is arriving without tokens (often due to link rewriting).
       </div>
     </div>
 
     <div class="card">
-      <div class="muted" id="statusText">
-        Waiting for recovery session…
-      </div>
-
-      <div id="formBox" style="display:none;">
-        <label style="margin-top:12px;">New password</label>
-        <input id="pw1" type="password" autocomplete="new-password" />
-
-        <label>Confirm new password</label>
-        <input id="pw2" type="password" autocomplete="new-password" />
-
-        <button id="setPw" class="btn" style="margin-top:12px;">Set new password</button>
-        <button id="goDoor" class="btn2" style="display:none;">Go to Door</button>
-
-        <div class="muted" style="margin-top:10px;">
-          Minimum 8 characters recommended. Use something unique.
-        </div>
-      </div>
-
-      <pre id="out" style="display:none;">{}</pre>
+      <strong>Debug (safe)</strong>
+      <div class="muted">Shows which token fields arrived (values are not displayed).</div>
+      <pre id="debug">{}</pre>
     </div>
   </div>
 
 <script type="module">
   import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-  // Must match your existing door.html values
+  // Match your door.html
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY =
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWEycmVvZmlvbiIsInJvbGUiOiJhbm9uIiwiaWF0IjoxNzM1NjU2NTI2LCJleHAiOjIwODE4MjI5MjZ9.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-    auth: { detectSessionInUrl: true } // important for recovery links
+    auth: { detectSessionInUrl: true }
   });
 
   const statusPill = document.getElementById("statusPill");
   const statusText = document.getElementById("statusText");
   const formBox = document.getElementById("formBox");
-  const out = document.getElementById("out");
+  const debug = document.getElementById("debug");
   const goDoor = document.getElementById("goDoor");
 
   const pw1 = document.getElementById("pw1");
@@ -84,84 +83,112 @@
     statusText.textContent = text;
   }
 
-  function showDebug(obj) {
-    out.style.display = "";
-    out.textContent = JSON.stringify(obj, null, 2);
+  function safeDebug(obj) {
+    debug.textContent = JSON.stringify(obj, null, 2);
   }
 
-  // Attempt to exchange code for session (PKCE links)
-  async function tryExchangeCode() {
-    const url = new URL(window.location.href);
-    const code = url.searchParams.get("code");
-    if (!code) return;
+  function parseUrl() {
+    const u = new URL(window.location.href);
+    const hash = new URLSearchParams((u.hash || "").replace(/^#/, ""));
+    const qs = u.searchParams;
 
-    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-    if (error) {
-      showDebug({ stage: "exchangeCodeForSession", error: error.message });
-    } else {
-      showDebug({ stage: "exchangeCodeForSession", ok: true, data });
-    }
+    // Common Supabase variants:
+    // 1) ?code=... (PKCE)
+    // 2) ?token_hash=...&type=recovery
+    // 3) #access_token=...&refresh_token=...&type=recovery
+    return {
+      has_code: !!qs.get("code"),
+      has_token_hash: !!qs.get("token_hash"),
+      type_qs: qs.get("type") || null,
+      has_access_token_hash: !!hash.get("access_token"),
+      has_refresh_token_hash: !!hash.get("refresh_token"),
+      type_hash: hash.get("type") || null
+    };
   }
 
-  async function loadRecoverySession() {
-    // Some reset links deliver "code" param; others deliver tokens in hash.
-    await tryExchangeCode();
+  async function establishSessionFromUrl() {
+    const u = new URL(window.location.href);
+    const qs = u.searchParams;
+    const code = qs.get("code");
+    const token_hash = qs.get("token_hash");
+    const type = qs.get("type");
 
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      setStatus(false, "Error checking session.");
-      showDebug({ stage: "getSession", error: error.message });
-      return null;
+    // PKCE code exchange
+    if (code) {
+      const { error } = await supabase.auth.exchangeCodeForSession(code);
+      if (error) return { ok:false, stage:"exchangeCodeForSession", error:error.message };
+      return { ok:true, stage:"exchangeCodeForSession" };
     }
 
-    const session = data?.session ?? null;
-    if (!session) {
-      setStatus(false, "No recovery session found. Open the password reset email link again.");
-      return null;
+    // token_hash verify
+    if (token_hash && type) {
+      const { error } = await supabase.auth.verifyOtp({ token_hash, type });
+      if (error) return { ok:false, stage:"verifyOtp", error:error.message };
+      return { ok:true, stage:"verifyOtp" };
     }
 
-    // If we have any session at all, allow password update.
+    // access_token in hash is handled by detectSessionInUrl on init.
+    return { ok:true, stage:"detectSessionInUrl" };
+  }
+
+  async function waitForSession() {
+    // Some flows set session asynchronously after init; give it a moment.
+    for (let i = 0; i < 10; i++) {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) return { ok:false, error:error.message };
+      if (data?.session) return { ok:true, session: data.session };
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return { ok:false, error:"No session detected" };
+  }
+
+  async function main() {
+    const urlInfo = parseUrl();
+    safeDebug({
+      url_tokens_present: urlInfo,
+      note: "If all fields are false/null, you did not arrive here via a valid recovery link (or a link rewriter stripped the params)."
+    });
+
+    const establish = await establishSessionFromUrl();
+    if (!establish.ok) {
+      setStatus(false, "Recovery link detected but failed to establish session.");
+      safeDebug({ ...parseUrl(), establish_error: establish });
+      return;
+    }
+
+    const got = await waitForSession();
+    if (!got.ok) {
+      setStatus(false, "No recovery session found. Open the password reset email link again (not a bookmark).");
+      return;
+    }
+
     setStatus(true, "Recovery session detected. Set a new password below.");
     formBox.style.display = "";
-    return session;
   }
 
   document.getElementById("setPw").onclick = async () => {
     const a = String(pw1.value || "");
     const b = String(pw2.value || "");
 
-    if (a.length < 8) {
-      setStatus(false, "Password too short (minimum 8 characters).");
-      return;
-    }
-    if (a !== b) {
-      setStatus(false, "Passwords do not match.");
-      return;
-    }
+    if (a.length < 8) { setStatus(false, "Password too short (min 8)."); return; }
+    if (a !== b) { setStatus(false, "Passwords do not match."); return; }
 
     setStatus(true, "Setting password…");
 
-    const { data, error } = await supabase.auth.updateUser({ password: a });
+    const { error } = await supabase.auth.updateUser({ password: a });
     if (error) {
       setStatus(false, "Failed to set password.");
-      showDebug({ stage: "updateUser", error: error.message });
+      safeDebug({ update_error: error.message, url_tokens_present: parseUrl() });
       return;
     }
 
-    // Sign out so the recovery session doesn't linger on a shared device.
     await supabase.auth.signOut();
-
     setStatus(true, "Password updated. You can now sign in normally.");
-    showDebug({ stage: "updateUser", ok: true, data });
-
     goDoor.style.display = "";
-    goDoor.onclick = () => {
-      window.location.href = "./door.html";
-    };
+    goDoor.onclick = () => window.location.href = "./door.html";
   };
 
-  // Start
-  loadRecoverySession();
+  main();
 </script>
 </body>
 </html>
