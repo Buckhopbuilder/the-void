@@ -33,6 +33,14 @@
     .cand-row.selected { outline: 2px solid #3a3a3a; background:#1a1a1a; }
     mark { background: #2a2a2a; color: #fff; padding: 0 2px; border-radius: 4px; }
 
+  
+    button, .btn {
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
   </style>
 </head>
 <body>
@@ -87,20 +95,29 @@
       </div>
     </div>
 
-    <div class="card" id="manualCard">
-      <label>Guest email</label>
-      <input id="guestEmail" type="email" placeholder="Required for manual check-in">
-      <label>Full name</label>
-      <input id="guestName" type="text" placeholder="Required for both flows">
-
-      <div class="row" style="margin-top:12px;">
-        <button id="checkin" class="btn" style="flex:1;">Manual check-in</button>
-        <button id="nameSearch" class="btn secondary" style="flex:1;">Search by name (staff)</button>
-      
-        <button id="nextGuest" class="btn secondary" style="flex:1;">Next guest (clear)</button>
+    
+<div class="card" id="manualCard">
+      <strong>Manual lookup</strong>
+      <div class="muted" style="margin-top:6px;">
+        Search the guest. Tap the best match. Then confirm phone last 4 (or email prefix if no phone).
       </div>
 
-      <div id="candidatesBox" class="card" style="display:none; margin-top:14px; padding:14px;">
+      <!-- Keep IDs for JS compatibility -->
+      <input id="guestEmail" type="hidden" value="">
+      <label style="margin-top:12px;">Search name / email prefix / digits</label>
+      <input id="guestName" type="text" placeholder="Type 3+ letters…" inputmode="search" autocomplete="off">
+
+      <div class="row" style="margin-top:12px;">
+        <button id="nameSearch" class="btn" style="flex:1;">Search</button>
+        <button id="nextGuest" class="btn secondary" style="flex:1;">Next guest</button>
+      </div>
+
+      <!-- Hide legacy manual check-in button (still wired, but not shown) -->
+      <button id="checkin" class="btn" style="display:none;">Manual check-in</button>
+    </div>
+
+    <div id="candidatesBox"
+ class="card" style="display:none; margin-top:14px; padding:14px;">
         <strong>Name search results</strong>
         <div class="muted" style="margin-top:6px;">
           Select a match, then confirm identity. Default confirmation is <b>phone last 4</b>.
@@ -128,7 +145,10 @@
     <div class="card">
       <strong>Result</strong>
       <span id="resultPill" class="pill">Idle</span>
-      <pre id="out">{}</pre>
+      <details style="margin-top:10px;">
+        <summary class="muted" style="cursor:pointer; user-select:none;">Show details</summary>
+        <pre id="out">{}</pre>
+      </details>
     </div>
   </div>
 
@@ -210,6 +230,12 @@
   const confirmHint = document.getElementById("confirmHint");
   const phoneLast4 = document.getElementById("phoneLast4");
   const emailPrefix = document.getElementById("emailPrefix");
+  const verifyCard = document.getElementById("verifyCard");
+  const verifyPhoneBlock = document.getElementById("verifyPhoneBlock");
+  const verifyEmailBlock = document.getElementById("verifyEmailBlock");
+  const useEmailInstead = document.getElementById("useEmailInstead");
+  const usePhoneInstead = document.getElementById("usePhoneInstead");
+  const verifyHint = document.getElementById("verifyHint");
 
   let lastCandidates = [];
 let nameSearchTimer = null;
@@ -222,6 +248,7 @@ let holdTriggered = false;
 
   document.getElementById("nameSearch").onclick = async () => {
     confirmBox.style.display = "none";
+    verifyCard.style.display = "none";
     confirmHint.textContent = "";
     phoneLast4.value = "";
     emailPrefix.value = "";
@@ -255,8 +282,6 @@ let holdTriggered = false;
     lastCandidates = Array.isArray(json.candidates) ? json.candidates : [];
     candidatesBox.style.display = "";
     
-    guestName.blur(); // retract mobile keyboard
-    renderCandidates(guestName.value || "");
   function esc(s){ return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
   function highlight(text, q) {
@@ -341,11 +366,14 @@ let holdTriggered = false;
         row.classList.add("selected");
 
         selectedCandidateIndex = Number(row.dataset.idx);
-        confirmBox.style.display = "";
-        confirmHint.textContent = "Ask for phone last 4. If the guest never provided a phone, use email prefix.";
+        verifyCard.style.display = "";
+        verifyHint.textContent = "Selected. Ask for phone last 4."; 
         phoneLast4.value = "";
         emailPrefix.value = "";
-        phoneLast4.focus();
+        if (c.email) guestEmail.value = c.email;
+        verifyPhoneBlock.style.display = "";
+        verifyEmailBlock.style.display = "none";
+        // no auto-focus (prevents scroll-jolt)
       };
 
       candidateList.appendChild(row);
@@ -502,8 +530,39 @@ let holdTriggered = false;
   manualModeBtn.addEventListener("pointercancel", cancelHoldToEnable);
   manualModeBtn.addEventListener("pointerleave", cancelHoldToEnable);
 
+  // Prevent long-press text selection / context menu on mobile while using hold-to-enable
+  manualModeBtn.addEventListener("contextmenu", (e) => e.preventDefault());
+  manualModeBtn.addEventListener("touchstart", (e) => {
+    if (!manualMode && holdEnable.checked) {
+      e.preventDefault();
+      startHoldToEnable();
+    }
+  }, { passive: false });
+  manualModeBtn.addEventListener("touchend", (e) => {
+    if (!manualMode && holdEnable.checked) {
+      e.preventDefault();
+      cancelHoldToEnable();
+    }
+  }, { passive: false });
+
+
 
   document.getElementById("nextGuest").onclick = resetForNextGuest;
+
+  // Verify mode toggles
+  useEmailInstead.addEventListener("click", (e) => {
+    e.preventDefault();
+    verifyPhoneBlock.style.display = "none";
+    verifyEmailBlock.style.display = "";
+    verifyHint.textContent = "Using email prefix. Ask for the first letters of the email.";
+  });
+  usePhoneInstead.addEventListener("click", (e) => {
+    e.preventDefault();
+    verifyEmailBlock.style.display = "none";
+    verifyPhoneBlock.style.display = "";
+    verifyHint.textContent = "Using phone last 4.";
+  });
+
 
 // Debounced auto-search on typing
 guestName.addEventListener("input", () => {
