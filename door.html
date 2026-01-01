@@ -168,6 +168,9 @@
   const emailPrefix = document.getElementById("emailPrefix");
 
   let lastCandidates = [];
+let nameSearchTimer = null;
+let nameSearchInFlight = false;
+let checkinInFlight = false;
 
   document.getElementById("nameSearch").onclick = async () => {
     confirmBox.style.display = "none";
@@ -243,6 +246,9 @@
   };
 
   document.getElementById("confirmCheckin").onclick = async () => {
+  if (checkinInFlight) return;
+  checkinInFlight = true;
+
     const idx = candidateSelect.value ? Number(candidateSelect.value) : -1;
     const c = (idx >= 0 && idx < lastCandidates.length) ? lastCandidates[idx] : null;
     if (!c) {
@@ -293,6 +299,17 @@
   };
 
   refresh();
+
+// Debounced auto-search on typing
+guestName.addEventListener("input", () => {
+  clearTimeout(nameSearchTimer);
+  const q = (guestName.value || "").trim();
+  if (q.length < 3) return;
+  nameSearchTimer = setTimeout(() => {
+    document.getElementById("nameSearch").click();
+  }, 350);
+});
+
 </script>
 </body>
 </html>
