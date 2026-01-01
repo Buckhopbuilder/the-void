@@ -255,6 +255,8 @@ let holdTriggered = false;
     lastCandidates = Array.isArray(json.candidates) ? json.candidates : [];
     candidatesBox.style.display = "";
     
+    guestName.blur(); // retract mobile keyboard
+    renderCandidates(guestName.value || "");
   function esc(s){ return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
   function highlight(text, q) {
