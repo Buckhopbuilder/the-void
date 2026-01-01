@@ -21,6 +21,18 @@
     .pill.bad { border-color: rgba(255,120,120,0.35); background: rgba(255,120,120,0.10); }
     pre { white-space: pre-wrap; word-break: break-word; background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 12px; margin-top: 12px; }
     .muted { opacity: .8; font-size: 12px; }
+  
+    .candidate-list { margin-top: 10px; max-height: 320px; overflow: auto; border: 1px solid #2b2b2b; border-radius: 12px; background: #141414; }
+    .cand-row { display:flex; flex-direction:column; gap:4px; padding:12px; border-bottom:1px solid #2b2b2b; cursor:pointer; }
+    .cand-row:last-child { border-bottom:none; }
+    .cand-row:active { transform: scale(0.995); }
+    .cand-top { display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .cand-name { font-weight:700; }
+    .cand-meta { font-size: 13px; color:#bdbdbd; }
+    .cand-chip { font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid #2b2b2b; color:#d6d6d6; }
+    .cand-row.selected { outline: 2px solid #3a3a3a; background:#1a1a1a; }
+    mark { background: #2a2a2a; color: #fff; padding: 0 2px; border-radius: 4px; }
+
   </style>
 </head>
 <body>
@@ -49,7 +61,33 @@
       </div>
     </div>
 
-    <div class="card">
+    
+    <div class="card" id="modeCard" style="margin-bottom:14px;">
+      <strong>Mode</strong>
+      <div class="muted" style="margin-top:6px;">
+        Default is scanning. Use manual lookup only as a fallback (e.g., QR failure).
+      </div>
+      <div class="row" style="margin-top:12px;">
+        <button id="manualModeBtn" class="btn secondary" style="flex:1;">Enable manual lookup</button>
+        <label class="muted" style="display:flex; align-items:center; gap:10px; flex:1; justify-content:flex-end; user-select:none;">
+          <input id="holdEnable" type="checkbox" checked style="transform:scale(1.2);">
+          Hold to enable
+        </label>
+      </div>
+      <div id="modeHint" class="muted" style="margin-top:10px;">
+        Manual lookup is <b>OFF</b>.
+      </div>
+    </div>
+
+
+    <div class="card" id="scanHintCard" style="margin-bottom:14px;">
+      <strong>Scan</strong>
+      <div class="muted" style="margin-top:6px;">
+        Scan the guest's code as normal. If scanning fails, tap <b>Enable manual lookup</b> above.
+      </div>
+    </div>
+
+    <div class="card" id="manualCard">
       <label>Guest email</label>
       <input id="guestEmail" type="email" placeholder="Required for manual check-in">
       <label>Full name</label>
@@ -58,6 +96,8 @@
       <div class="row" style="margin-top:12px;">
         <button id="checkin" class="btn" style="flex:1;">Manual check-in</button>
         <button id="nameSearch" class="btn secondary" style="flex:1;">Search by name (staff)</button>
+      
+        <button id="nextGuest" class="btn secondary" style="flex:1;">Next guest (clear)</button>
       </div>
 
       <div id="candidatesBox" class="card" style="display:none; margin-top:14px; padding:14px;">
@@ -68,7 +108,8 @@
         </div>
 
         <label style="margin-top:12px;">Candidates</label>
-        <select id="candidateSelect"></select>
+        <div id="resultsMeta" class="muted" style="margin-top:6px;"></div>
+        <div id="candidateList" class="candidate-list"></div>
 
         <div id="confirmBox" style="display:none;">
           <label style="margin-top:12px;">Phone last 4 (preferred)</label>
@@ -138,6 +179,7 @@
   };
 
   document.getElementById("checkin").onclick = async () => {
+  if (!manualMode) return;
     const { data } = await supabase.auth.getSession();
     const token = data.session?.access_token;
     const res = await fetch(
@@ -161,7 +203,9 @@
 
   // ----- Secondary flow: name-only search -----
   const candidatesBox = document.getElementById("candidatesBox");
-  const candidateSelect = document.getElementById("candidateSelect");
+  const candidateList = document.getElementById("candidateList");
+  const resultsMeta = document.getElementById("resultsMeta");
+  let selectedCandidateIndex = -1;
   const confirmBox = document.getElementById("confirmBox");
   const confirmHint = document.getElementById("confirmHint");
   const phoneLast4 = document.getElementById("phoneLast4");
@@ -171,6 +215,10 @@
 let nameSearchTimer = null;
 let nameSearchInFlight = false;
 let checkinInFlight = false;
+let manualMode = false;
+let holdTimer = null;
+let holdTriggered = false;
+
 
   document.getElementById("nameSearch").onclick = async () => {
     confirmBox.style.display = "none";
@@ -206,38 +254,102 @@ let checkinInFlight = false;
 
     lastCandidates = Array.isArray(json.candidates) ? json.candidates : [];
     candidatesBox.style.display = "";
-    candidateSelect.innerHTML = "";
+    
+  function esc(s){ return (s ?? "").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
 
-    if (!lastCandidates.length) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "No matches";
-      candidateSelect.appendChild(opt);
-      confirmBox.style.display = "none";
-      return;
+  function highlight(text, q) {
+    const t = (text ?? "").toString();
+    const qq = (q ?? "").trim();
+    if (qq.length < 1) return esc(t);
+    const idx = t.toLowerCase().indexOf(qq.toLowerCase());
+    if (idx === -1) return esc(t);
+    const a = t.slice(0, idx);
+    const b = t.slice(idx, idx + qq.length);
+    const c = t.slice(idx + qq.length);
+    return esc(a) + "<mark>" + esc(b) + "</mark>" + esc(c);
+  }
+
+  function rankAndFilterCandidates(cands, q) {
+    const qq = (q ?? "").trim().toLowerCase();
+    const toks = qq.split(/\s+/).filter(Boolean);
+    const scored = [];
+
+    for (let i = 0; i < cands.length; i++) {
+      const c = cands[i] || {};
+      const name = (c.full_name || "").toLowerCase();
+      const email = (c.email || c.masked_email || "").toLowerCase();
+      const phone = (c.phone_e164 || "").toLowerCase();
+
+      // Basic token match: all tokens must appear somewhere in name or email.
+      let ok = true;
+      for (const t of toks) {
+        if (!(name.includes(t) || email.includes(t) || phone.includes(t))) { ok = false; break; }
+      }
+      if (!ok) continue;
+
+      // Score: startswith > includes; shorter distance is better
+      let score = 0;
+      if (name.startsWith(qq)) score += 100;
+      if (name.includes(qq)) score += 40;
+      if (email.startsWith(qq)) score += 30;
+      if (email.includes(qq)) score += 10;
+
+      // Tie-breakers: alphabetical name
+      scored.push({ i, c, score, name });
     }
 
-    const opt0 = document.createElement("option");
-    opt0.value = "";
-    opt0.textContent = "Select a candidate…";
-    candidateSelect.appendChild(opt0);
+    scored.sort((a,b) => (b.score - a.score) || a.name.localeCompare(b.name));
+    return scored;
+  }
 
-    for (let i = 0; i < lastCandidates.length; i++) {
-      const c = lastCandidates[i];
-      const opt = document.createElement("option");
-      opt.value = String(i);
+  function renderCandidates(q) {
+    selectedCandidateIndex = -1;
+    candidateList.innerHTML = "";
+    confirmBox.style.display = "none";
+
+    const scored = rankAndFilterCandidates(lastCandidates, q);
+    const shown = scored.slice(0, 25);
+
+    const total = scored.length;
+    resultsMeta.textContent = total === 0
+      ? "No close matches. Try more letters (first + last), or email prefix."
+      : (total > 25 ? `Showing top 25 of ${total}. Type more to narrow.` : `Showing ${total} match${total===1?"":"es"}. Tap a name.`);
+
+    if (shown.length === 0) return;
+
+    for (const s of shown) {
+      const c = s.c;
+      const row = document.createElement("div");
+      row.className = "cand-row";
+      row.dataset.idx = String(s.i);
+
       const er = c.entries_remaining ?? "?";
-      opt.textContent = `${c.full_name} • ${c.masked_email} • entries:${er}`;
-      candidateSelect.appendChild(opt);
-    }
-  };
 
-  candidateSelect.onchange = () => {
-    const v = candidateSelect.value;
-    if (!v) {
-      confirmBox.style.display = "none";
-      return;
+      row.innerHTML = `
+        <div class="cand-top">
+          <div class="cand-name">${highlight(c.full_name || "(no name)", q)}</div>
+          <span class="cand-chip">entries: ${esc(er)}</span>
+        </div>
+        <div class="cand-meta">${esc(c.masked_email || c.email || "")}${c.phone_e164 ? " • " + esc(c.phone_e164) : ""}</div>
+      `;
+
+      row.onclick = () => {
+        // clear previous selection styling
+        [...candidateList.querySelectorAll(".cand-row")].forEach(el => el.classList.remove("selected"));
+        row.classList.add("selected");
+
+        selectedCandidateIndex = Number(row.dataset.idx);
+        confirmBox.style.display = "";
+        confirmHint.textContent = "Ask for phone last 4. If the guest never provided a phone, use email prefix.";
+        phoneLast4.value = "";
+        emailPrefix.value = "";
+        phoneLast4.focus();
+      };
+
+      candidateList.appendChild(row);
     }
+  }
+
     confirmBox.style.display = "";
     confirmHint.textContent = "Ask for phone last 4. If the guest never provided a phone, use email prefix.";
     phoneLast4.value = "";
@@ -249,7 +361,7 @@ let checkinInFlight = false;
   if (checkinInFlight) return;
   checkinInFlight = true;
 
-    const idx = candidateSelect.value ? Number(candidateSelect.value) : -1;
+    const idx = selectedCandidateIndex;
     const c = (idx >= 0 && idx < lastCandidates.length) ? lastCandidates[idx] : null;
     if (!c) {
       showResult(false, { ok:false, error:"Select a candidate first" });
@@ -300,8 +412,100 @@ let checkinInFlight = false;
 
   refresh();
 
+
+  function resetForNextGuest() {
+    guestName.value = "";
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    confirmBox.style.display = "none";
+    candidatesBox.style.display = "none";
+    lastCandidates = [];
+    selectedCandidateIndex = -1;
+    resultsMeta.textContent = "";
+    candidateList.innerHTML = "";
+    showResult(true, { ok:true, note:"Ready" });
+    guestName.focus();
+  }
+
+
+  function setManualMode(on) {
+    manualMode = !!on;
+
+    // Hide/show manual UI
+    manualCard.style.display = manualMode ? "" : "none";
+    candidatesBox.style.display = "none";
+    confirmBox.style.display = "none";
+
+    // Show scan hint when manual is off
+    scanHintCard.style.display = manualMode ? "none" : "";
+
+    // Update button + hint
+    manualModeBtn.textContent = manualMode ? "Disable manual lookup" : "Enable manual lookup";
+    modeHint.innerHTML = manualMode
+      ? 'Manual lookup is <b>ON</b>. Use it only when scanning fails.'
+      : 'Manual lookup is <b>OFF</b>.';
+
+    if (!manualMode) {
+      // Clear form when turning off to avoid stale details
+      resetForNextGuest();
+    } else {
+      guestName.focus();
+    }
+  }
+
+  // Default: manual mode off
+  setManualMode(false);
+
+  function startHoldToEnable() {
+    if (manualMode) return; // already on
+    holdTriggered = false;
+    clearTimeout(holdTimer);
+    holdTimer = setTimeout(() => {
+      holdTriggered = true;
+      setManualMode(true);
+    }, 700);
+  }
+
+  function cancelHoldToEnable() {
+    clearTimeout(holdTimer);
+    holdTimer = null;
+  }
+
+  // Button behavior:
+  // - If manual is ON: tap disables immediately.
+  // - If manual is OFF:
+  //     - if "Hold to enable" checked: require hold
+  //     - else: tap enables
+  manualModeBtn.addEventListener("click", (e) => {
+    if (manualMode) {
+      setManualMode(false);
+      return;
+    }
+    if (!holdEnable.checked) {
+      setManualMode(true);
+      return;
+    }
+    // If hold is required and this was a simple click (no hold), do nothing.
+    // (Hold will be handled via pointer events)
+    if (!holdTriggered) {
+      // Small nudge without being noisy
+      modeHint.innerHTML = 'Manual lookup is <b>OFF</b>. Hold the button to enable.';
+    }
+  });
+
+  manualModeBtn.addEventListener("pointerdown", () => {
+    if (!manualMode && holdEnable.checked) startHoldToEnable();
+  });
+  manualModeBtn.addEventListener("pointerup", cancelHoldToEnable);
+  manualModeBtn.addEventListener("pointercancel", cancelHoldToEnable);
+  manualModeBtn.addEventListener("pointerleave", cancelHoldToEnable);
+
+
+  document.getElementById("nextGuest").onclick = resetForNextGuest;
+
 // Debounced auto-search on typing
 guestName.addEventListener("input", () => {
+  if (!manualMode) return;
   clearTimeout(nameSearchTimer);
   const q = (guestName.value || "").trim();
   if (q.length < 3) return;
