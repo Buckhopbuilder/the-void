@@ -378,6 +378,9 @@ let holdTriggered = false;
 
       candidateList.appendChild(row);
     }
+
+  // Render candidates for current query
+  renderCandidates((guestName.value || "").trim());
   }
 
     confirmBox.style.display = "";
