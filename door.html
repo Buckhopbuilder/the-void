@@ -283,8 +283,9 @@
     candidatesEl.innerHTML = "";
     lastCandidates = [];
     hide(searchStatus);
-    // keep qInput text (some staff prefer to reuse). If you want cleared, uncomment:
-    // qInput.value = "";
+    qInput.value = "";
+    setPill(resultPill, "", "Idle");
+    out.textContent = "{}";
   }
 
   function maskEmail(email){
@@ -426,11 +427,21 @@
       const name = c.full_name || c.name || c.fullName || "(no name)";
       const email = c.email || c.guest_email || "";
       const phone = c.phone_e164 || c.phone || "";
-      const rem = (c.entries_remaining ?? c.remaining ?? null);
+      const rem = (c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null);
+      const lastCheckin = (c.last_checkin_at ?? c.lastCheckinAt ?? null);
       const metaBits = [];
       if(email) metaBits.push(maskEmail(email));
       if(phone) metaBits.push("📱");
-      if(rem !== null && rem !== undefined) metaBits.push("entries: " + rem);
+      if(rem !== null && rem !== undefined){
+        if(Number(rem) <= 0){
+          metaBits.push("ALREADY CHECKED IN");
+        } else {
+          metaBits.push("entries: " + rem);
+        }
+      }
+      if(lastCheckin && (rem !== null && rem !== undefined) && Number(rem) <= 0){
+        metaBits.push("at " + String(lastCheckin).replace('T',' ').replace('Z',''));
+      }
 
       const div = document.createElement("div");
       div.className = "cand";
@@ -448,15 +459,34 @@
   function selectCandidate(c){
     selectedCandidate = c;
     const name = c.full_name || c.name || "(no name)";
-    const email = c.email || c.guest_email || "";
+    const email = c.email || c.guest_email || c.masked_email || "";
     const rid = c.registration_id || c.id || "";
-    selectedMeta.innerHTML = `Selected: <b>${esc(name)}</b> <span class="muted">(${esc(maskEmail(email))})</span>`;
+    const rem = (c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null);
+    const lastCheckin = (c.last_checkin_at ?? c.lastCheckinAt ?? null);
+
+    let statusLine = "";
+    if(rem !== null && rem !== undefined && Number(rem) <= 0){
+      statusLine = " • ALREADY CHECKED IN" + (lastCheckin ? (" • " + String(lastCheckin).replace('T',' ').replace('Z','')) : "");
+    } else if(rem !== null && rem !== undefined){
+      statusLine = " • entries remaining: " + rem;
+    }
+
+    selectedMeta.innerHTML = `Selected: <b>${esc(name)}</b> <span class="muted">(${esc(maskEmail(email))})</span><div class="muted" style="margin-top:6px;">${esc(rid)}${esc(statusLine)}</div>`;
     verifyCard.style.display = "";
     verifyPhoneBlock.style.display = "";
     verifyEmailBlock.style.display = "none";
     phoneLast4.value = "";
     emailPrefix.value = "";
     hide(verifyMsg);
+
+    if(rem !== null && rem !== undefined && Number(rem) <= 0){
+      confirmBtn.disabled = true;
+      confirmBtn.style.opacity = "0.6";
+      banner(verifyMsg, "warn", "Already checked in. Do not re-check-in.");
+    } else {
+      confirmBtn.disabled = false;
+      confirmBtn.style.opacity = "1";
+    }
   }
 
   // ==== Search (event-scoped only) ====
@@ -613,8 +643,18 @@ renderCandidates(normalized);
       banner(verifyMsg, "good", "Checked in. Tap Next guest.");
       showResult(true, json);
     } else {
-      // Subtle failure: don't scream at guest. Give staff a calm message.
-      banner(verifyMsg, "warn", (json.code || "Not verified") + ". Try again or use the other method.");
+      if(json && json.code === "already_checked_in"){
+        const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
+        banner(verifyMsg, "warn", "Already checked in" + at + ".");
+      } else if(json && json.code === "not_verified"){
+        banner(verifyMsg, "warn", "Not verified. Try again (or use the other method).");
+      } else if(json && json.code === "no_active_event"){
+        banner(verifyMsg, "bad", "No active event.");
+      } else if(json && json.code){
+        banner(verifyMsg, "warn", json.code + ".");
+      } else {
+        banner(verifyMsg, "warn", "Not verified. Try again.");
+      }
       showResult(false, json);
     }
   }
