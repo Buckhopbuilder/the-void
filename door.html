@@ -407,7 +407,9 @@
 
   // ==== Candidate rendering ====
   function renderCandidates(cands){
-    lastCandidates = Array.isArray(cands) ? cands : [];
+    // Tolerate either an array or an object like { ok:true, candidates:[...] }
+    const arr = (Array.isArray(cands) ? cands : (cands && typeof cands === "object" && Array.isArray(cands.candidates) ? cands.candidates : []));
+    lastCandidates = arr;
     if(lastCandidates.length === 0){
       hide(candidatesWrap);
       banner(searchStatus, "warn", "No matches. Try more letters (or email prefix).");
@@ -511,8 +513,15 @@
       return;
     }
 
-    showResult(true, { ok:true, args_used: argsUsed, candidates: data });
-    renderCandidates(data);
+    // Some deployments return an object: { ok: true, candidates: [...] } (not a raw array).
+// Normalize so the UI always renders an array.
+const raw = data;
+const normalized = (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.candidates))
+  ? raw.candidates
+  : raw;
+
+showResult(true, { ok:true, args_used: argsUsed, candidates: raw });
+renderCandidates(normalized);
   }
 
   // ==== Confirm check-in ====
