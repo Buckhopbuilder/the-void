@@ -2,227 +2,282 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <title>VoidPass Door</title>
-
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VoidPass — Door</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    :root{
+    :root {
       --bg:#0b1020;
-      --card:#111a2b;
-      --card2:#0f1726;
+      --panel:rgba(255,255,255,.06);
+      --panel2:rgba(255,255,255,.08);
+      --border:rgba(255,255,255,.10);
       --text:#e8eefc;
-      --muted:#b8c2dd;
-      --line:rgba(255,255,255,.10);
+      --muted:rgba(232,238,252,.75);
       --good:rgba(16,185,129,.18);
       --warn:rgba(245,158,11,.18);
-      --bad:rgba(239,68,68,.18);
-      --btn:#1f2a44;
-      --btn2:#243150;
-      --accent:#22c55e;
+      --bad:rgba(239,68,68,.20);
+      --goodStroke:rgba(16,185,129,.55);
+      --warnStroke:rgba(245,158,11,.55);
+      --badStroke:rgba(239,68,68,.55);
+      --pill:rgba(255,255,255,.10);
+      --shadow: 0 10px 35px rgba(0,0,0,.35);
+      --r:16px;
+      --pad:14px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
     }
-    *{box-sizing:border-box;}
-    body{
+    * { box-sizing:border-box; }
+    html,body { height:100%; }
+    body {
       margin:0;
-      background:radial-gradient(1200px 800px at 30% -20%, rgba(34,197,94,.10), transparent 60%),
-                 radial-gradient(900px 600px at 90% 10%, rgba(59,130,246,.10), transparent 60%),
-                 var(--bg);
+      background: radial-gradient(1000px 600px at 30% 0%, rgba(56,189,248,.14), transparent 60%),
+                  radial-gradient(900px 600px at 80% 20%, rgba(167,139,250,.12), transparent 60%),
+                  var(--bg);
       color:var(--text);
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-      padding:18px 14px 36px;
+      -webkit-font-smoothing:antialiased;
+      padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 90px) 10px;
     }
-    .wrap{max-width:820px;margin:0 auto;}
-    .card{
-      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02));
-      border:1px solid var(--line);
-      border-radius:18px;
-      padding:16px;
-      box-shadow:0 18px 40px rgba(0,0,0,.35);
-      margin-bottom:14px;
+    .wrap { max-width: 820px; margin:0 auto; }
+    .topbar {
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      padding: 10px 12px;
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      position: sticky; top: 10px; z-index: 5;
+      backdrop-filter: blur(10px);
     }
-    .title{font-size:20px;font-weight:800;letter-spacing:.5px;}
-    .muted{color:var(--muted);}
-    label{display:block;margin-top:10px;color:var(--muted);font-size:13px;}
-    input{
-      width:100%;
-      margin-top:6px;
-      background:rgba(0,0,0,.20);
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:12px 12px;
-      color:var(--text);
-      font-size:16px;
-      outline:none;
+    .brand { font-weight:700; letter-spacing:.2px; }
+    .pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .pill {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius:999px;
+      background: var(--pill);
+      border:1px solid var(--border);
+      color: var(--muted);
+      user-select:none;
+      white-space:nowrap;
     }
-    input:focus{border-color:rgba(34,197,94,.45); box-shadow:0 0 0 4px rgba(34,197,94,.12);}
-    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
-    .btn{
-      background:linear-gradient(180deg, rgba(34,197,94,.18), rgba(34,197,94,.08));
-      border:1px solid rgba(34,197,94,.25);
-      color:var(--text);
-      border-radius:14px;
-      padding:12px 14px;
-      font-weight:700;
-      cursor:pointer;
-      min-height:44px;
-    }
-    .btn.secondary{
-      background:linear-gradient(180deg, rgba(59,130,246,.14), rgba(59,130,246,.06));
-      border:1px solid rgba(59,130,246,.22);
-    }
-    .btn.ghost{
-      background:rgba(255,255,255,.04);
-      border:1px solid var(--line);
-    }
-    .btn:active{transform:translateY(1px);}
-    .pill{
-      display:inline-flex;align-items:center;gap:8px;
-      padding:6px 10px;border-radius:999px;border:1px solid var(--line);
-      font-size:12px;color:var(--muted);
-      background:rgba(0,0,0,.18);
-    }
-    .pill.ok{background:var(--good); color:#d1fae5; border-color:rgba(16,185,129,.25);}
-    .pill.warn{background:var(--warn); color:#fde68a; border-color:rgba(245,158,11,.25);}
-    .pill.bad{background:var(--bad); color:#fecaca; border-color:rgba(239,68,68,.25);}
+    .pill.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    .pill.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    .pill.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
 
-    /* Candidates list */
-    .list{margin-top:10px;display:flex;flex-direction:column;gap:10px;}
-    .cand{
-      padding:12px 12px;
-      border-radius:14px;
-      border:1px solid var(--line);
-      background:rgba(0,0,0,.16);
+    .grid { display:grid; gap:12px; margin-top:12px; }
+    .card {
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      padding: var(--pad);
+    }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input[type="text"], input[type="password"] {
+      width:100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      outline:none;
+      font-size:16px;
+    }
+    input::placeholder { color: rgba(232,238,252,.45); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row > * { flex: 1 1 auto; }
+    button {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 14px;
       cursor:pointer;
       user-select:none;
-      -webkit-user-select:none;
-      -webkit-touch-callout:none;
+      touch-action:manipulation;
     }
-    .cand:active{transform:translateY(1px);}
-    .cand .name{font-weight:800;font-size:16px;}
-    .cand .meta{margin-top:4px;font-size:12px;color:var(--muted);}
-    .kbd{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;}
-    details summary{cursor:pointer; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;}
-    .banner{
-      padding:10px 12px;border-radius:14px;border:1px solid var(--line);
-      background:rgba(0,0,0,.16); margin-top:10px;
+    button.primary { background: rgba(56,189,248,.18); border-color: rgba(56,189,248,.40); }
+    button.danger { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.45); }
+    button.good { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.45); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .tiny { color: var(--muted); font-size: 12px; }
+    .sep { height:1px; background: rgba(255,255,255,.10); margin: 12px 0; }
+
+    /* Live results list */
+    .resultsHeader { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .results { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+    .cand {
+      padding: 12px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.22);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
     }
-    .banner.good{background:var(--good);border-color:rgba(16,185,129,.25);}
-    .banner.bad{background:var(--bad);border-color:rgba(239,68,68,.25);}
-    .banner.warn{background:var(--warn);border-color:rgba(245,158,11,.25);}
+    .cand:active { transform: translateY(1px); }
+    .cand .left { min-width: 0; }
+    .cand .name { font-weight:700; font-size:16px; line-height:1.15; }
+    .cand .meta { margin-top:6px; color: var(--muted); font-size: 12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .tag {
+      padding: 4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .tag.warn { border-color: var(--warnStroke); background: var(--warn); color:#fff4d7; }
+    .tag.good { border-color: var(--goodStroke); background: var(--good); color:#d9fff1; }
+    .tag.bad  { border-color: var(--badStroke);  background: var(--bad);  color:#ffe0e0; }
+    .cand .right { text-align:right; }
+    .cand button { padding: 10px 12px; border-radius: 12px; }
+    .scroll { max-height: 55vh; overflow:auto; padding-right:2px; }
+    @media (max-height: 760px) {
+      .scroll { max-height: 48vh; }
+    }
 
-    /* Long-press safety */
-    button, .btn { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+    /* Bottom sheet verify */
+    .sheet {
+      position: fixed;
+      left: 0; right:0; bottom: 0;
+      padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px) 10px;
+      z-index: 10;
+    }
+    .sheetInner {
+      max-width: 820px; margin:0 auto;
+      background: rgba(11,16,32,.92);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: 0 14px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      padding: 12px;
+    }
+    .sheetTop { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .selectedLine { min-width:0; }
+    .selectedLine .title { font-weight:800; font-size: 14px; }
+    .selectedLine .sub { margin-top:4px; color: var(--muted); font-size: 12px; }
+    .modePills { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .modePills button { padding: 9px 10px; font-size:12px; }
+    .modePills .on { background: rgba(56,189,248,.22); border-color: rgba(56,189,248,.45); }
+    .sheetControls { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+    .sheetControls .full { grid-column: 1 / -1; }
+    .banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .banner.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    .banner.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    .banner.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
+    details summary { cursor:pointer; color: var(--muted); font-size: 12px; }
+    pre {
+      white-space: pre-wrap;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 10px;
+      font-size: 12px;
+      color: rgba(232,238,252,.82);
+      margin: 8px 0 0 0;
+    }
 
-    /* Phone usability */
-    .mini{font-size:12px;color:var(--muted);}
-    .hide{display:none !important;}
-    .twoCol{display:grid;grid-template-columns:1fr;gap:12px;}
-    @media(min-width:760px){ .twoCol{grid-template-columns:1.2fr .8fr;} }
-    .mutedLink{color:var(--muted);text-decoration:underline;}
-
-    .sticky-actions{
-      position:sticky;
-      bottom:10px;
-      z-index:6;
-      padding-top:10px;
-      background:linear-gradient(180deg, rgba(11,16,32,0), rgba(11,16,32,.85) 35%, rgba(11,16,32,.95));
+    /* Manual mode hold */
+    .holdBtn { position:relative; }
+    .holdBtn .bar {
+      position:absolute; left:10px; right:10px; bottom:8px; height:3px;
+      border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;
+      opacity:.9;
+    }
+    .holdBtn .bar > i {
+      display:block; height:100%; width:0%;
+      background: rgba(56,189,248,.65);
     }
   </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
-      <div class="title">VOIDPASS DOOR</div>
-      <div class="muted" style="margin-top:6px;">Door staff check-in (scan + manual fallback)</div>
-      <div class="row" style="margin-top:12px;justify-content:space-between;">
-        <span id="authPill" class="pill">Signed out</span>
-        <span id="eventPill" class="pill">Event: unknown</span>
+    <div class="topbar">
+      <div>
+        <div class="brand">VoidPass — Door</div>
+        <div class="tiny" id="eventPill">Event: …</div>
       </div>
-
-      <div id="authBox" style="margin-top:12px;">
-        <label>Email</label>
-        <input id="email" autocomplete="email" placeholder="you@example.com">
-        <label>Password</label>
-        <input id="password" type="password" autocomplete="current-password" placeholder="••••••••">
-        <div class="row" style="margin-top:12px;">
-          <button id="signIn" class="btn" style="flex:1;">Sign in</button>
-          <button id="signOut" class="btn ghost" style="flex:1;">Sign out</button>
-        </div>
-        <div id="authMsg" class="muted" style="margin-top:10px;"></div>
+      <div class="pills">
+        <div class="pill" id="authPill">Auth: …</div>
+        <div class="pill" id="modePill">Mode: Scanner</div>
+        <button id="manualHold" class="holdBtn" title="Hold to enable manual lookup">Hold: Manual<div class="bar"><i id="holdBar"></i></div></button>
+        <button id="signOutBtn">Sign out</button>
       </div>
     </div>
 
-    <div class="card">
-      <div class="row" style="justify-content:space-between;gap:10px;">
-        <div>
-          <div class="title" style="font-size:18px;">Mode</div>
-          <div class="muted" style="margin-top:6px;">Default is scanning. Enable manual lookup only as fallback (QR failure).</div>
+    <div class="grid">
+      <div class="card" id="scanCard">
+        <div class="resultsHeader">
+          <div>
+            <div style="font-weight:800;">Manual fallback (search)</div>
+            <div class="muted">Hold “Manual” to enable. Type 2+ chars. List updates as you type.</div>
+          </div>
+          <div class="row" style="justify-content:flex-end; gap:8px;">
+            <button id="nextGuestTop" class="good">Next guest</button>
+            <button id="toggleDebug">Debug</button>
+          </div>
         </div>
-        <div class="row" style="gap:10px;">
-          <button id="manualToggleBtn" class="btn ghost">Manual: OFF</button>
-          <span class="pill kbd">Hold 0.8s</span>
+
+        <div class="sep"></div>
+
+        <label for="q">Search guest</label>
+        <input id="q" type="text" placeholder="Start typing name / email / digits…" autocomplete="off" inputmode="text" disabled />
+
+        <div class="muted" id="searchStatus" style="margin-top:8px; display:none;"></div>
+
+        <div class="results" style="margin-top:12px;">
+          <div class="resultsHeader">
+            <div class="muted" id="resultsMeta">No search yet.</div>
+            <div class="muted" id="resultsCount"></div>
+          </div>
+
+          <div class="scroll" id="resultsScroll" style="display:none;">
+            <div id="results"></div>
+          </div>
         </div>
+
+        <details id="debugDetails" style="display:none; margin-top:12px;">
+          <summary>Result JSON (for debugging)</summary>
+          <pre id="debugOut">{}</pre>
+        </details>
       </div>
-      <div id="modeMsg" class="muted" style="margin-top:10px;"></div>
     </div>
+  </div>
 
-    <div class="card" id="manualCard" style="display:none;">
-      <div class="title" style="font-size:18px;">Manual lookup</div>
-      <div class="muted" style="margin-top:6px;">Search → tap match → verify → confirm.</div>
-
-      <label>Search name / email prefix / digits</label>
-      <input id="q" placeholder="Type 3+ letters…" inputmode="search" autocomplete="off">
-
-      <div class="row" style="margin-top:12px;">
-        <button id="searchBtn" class="btn" style="flex:1;">Search</button>
-        <button id="nextBtn" class="btn secondary" style="flex:1;">Next guest</button>
-      </div>
-
-      <div id="searchStatus" class="banner" style="display:none;"></div>
-
-      <div id="candidatesWrap" style="display:none;">
-        <div class="muted" style="margin-top:12px;">Candidates</div>
-        <div id="candidates" class="list"></div>
-      </div>
-    </div>
-
-    <div class="card" id="verifyCard" style="display:none;">
-      <div class="title" style="font-size:18px;">Verify</div>
-      <div id="selectedMeta" class="muted" style="margin-top:6px;"></div>
-
-      <div id="verifyPhoneBlock" style="margin-top:10px;">
-        <label>Phone last 4</label>
-        <input id="phoneLast4" inputmode="numeric" maxlength="4" placeholder="1234">
-        <div class="muted" style="margin-top:8px;">
-          <a href="#" id="useEmailInstead">Use email prefix instead</a>
+  <div class="sheet" id="sheet">
+    <div class="sheetInner">
+      <div class="sheetTop">
+        <div class="selectedLine">
+          <div class="title" id="selTitle">No guest selected</div>
+          <div class="sub" id="selSub">Select a guest from the list above.</div>
+        </div>
+        <div class="modePills">
+          <button id="modePhone">Phone last4</button>
+          <button id="modeEmail">Email prefix</button>
         </div>
       </div>
 
-      <div id="verifyEmailBlock" style="display:none;margin-top:10px;">
-        <label>Email prefix</label>
-        <input id="emailPrefix" placeholder="first letters…">
-        <div class="muted" style="margin-top:8px;">
-          <a href="#" id="usePhoneInstead">Use phone last 4 instead</a>
+      <div class="sheetControls">
+        <div id="phoneBlock">
+          <label for="phoneLast4">Phone last 4 digits</label>
+          <input id="phoneLast4" type="text" placeholder="e.g. 4937" inputmode="numeric" />
         </div>
+        <div id="emailBlock">
+          <label for="emailPrefix">Email prefix</label>
+          <input id="emailPrefix" type="text" placeholder="e.g. jamie" inputmode="text" />
+        </div>
+        <button id="confirmBtn" class="primary full" disabled>Confirm check-in</button>
+        <button id="nextGuest" class="good">Next guest</button>
       </div>
 
-      <div class="row" style="margin-top:12px;">
-        <button id="confirmBtn" class="btn" style="flex:1;">Confirm check-in</button>
-      </div>
-
-      <div id="verifyMsg" class="banner" style="display:none;margin-top:12px;"></div>
-    </div>
-
-    <div class="card">
-      <div class="row" style="justify-content:space-between;">
-        <div class="title" style="font-size:18px;">Result</div>
-        <span id="resultPill" class="pill">Idle</span>
-      </div>
-      <details style="margin-top:10px;">
-        <summary class="muted">Show details</summary>
-        <pre id="out" style="margin:10px 0 0; white-space:pre-wrap; word-break:break-word; background:rgba(0,0,0,.22); border:1px solid var(--line); padding:12px; border-radius:14px;">{}</pre>
-      </details>
+      <div id="banner" class="banner" style="display:none;"></div>
     </div>
   </div>
 
@@ -232,533 +287,470 @@
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_ma90uwKLz7Igb_xn9nXVwQ_W6k2KfiH";
 
-  // If your existing door.html already has the anon key embedded,
-  // replace this placeholder with that same value.
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // ==== Elements ====
-  const el = (id) => document.getElementById(id);
-  const authPill = el("authPill");
-  const eventPill = el("eventPill");
-  const authMsg = el("authMsg");
-  const modeMsg = el("modeMsg");
-  const manualToggleBtn = el("manualToggleBtn");
-  const manualCard = el("manualCard");
-  const verifyCard = el("verifyCard");
-  const qInput = el("q");
-  const searchBtn = el("searchBtn");
-  const nextBtn = el("nextBtn");
-  const candidatesWrap = el("candidatesWrap");
-  const candidatesEl = el("candidates");
-  const searchStatus = el("searchStatus");
-  const selectedMeta = el("selectedMeta");
-  const phoneLast4 = el("phoneLast4");
-  const emailPrefix = el("emailPrefix");
-  const verifyPhoneBlock = el("verifyPhoneBlock");
-  const verifyEmailBlock = el("verifyEmailBlock");
-  const useEmailInstead = el("useEmailInstead");
-  const usePhoneInstead = el("usePhoneInstead");
-  const confirmBtn = el("confirmBtn");
-  const verifyMsg = el("verifyMsg");
-  const resultPill = el("resultPill");
-  const out = el("out");
-
-  // ==== State ====
-  let manualEnabled = false;
-  let activeEventId = null;
-  let selectedCandidate = null;
-  let lastCandidates = [];
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   // ==== Helpers ====
-  function setPill(pill, kind, text){
-    pill.className = "pill" + (kind ? (" " + kind) : "");
-    pill.textContent = text;
-  }
-  function showOut(obj){
-    try { out.textContent = JSON.stringify(obj, null, 2); }
-    catch { out.textContent = String(obj); }
-  }
-  function showResult(ok, obj){
-    setPill(resultPill, ok ? "ok" : "bad", ok ? "OK" : "ERR");
-    showOut(obj);
-  }
-  function banner(target, kind, text){
-    target.style.display = "";
-    target.className = "banner " + kind;
-    target.textContent = text;
-  }
-  function hide(target){ target.style.display = "none"; }
-  function clearForNext(){
-    selectedCandidate = null;
-    hide(verifyCard);
-    hide(verifyMsg);
-    phoneLast4.value = "";
-    emailPrefix.value = "";
-    hide(candidatesWrap);
-    candidatesEl.innerHTML = "";
-    lastCandidates = [];
-    hide(searchStatus);
-    qInput.value = "";
-    setPill(resultPill, "", "Idle");
-    out.textContent = "{}";
-  }
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const maskEmail = (email) => {
+    const e = String(email||"");
+    const at = e.indexOf("@");
+    if(at<=1) return e ? e[0] + "…@" + e.slice(at+1) : "";
+    const local = e.slice(0,at);
+    const domain = e.slice(at+1);
+    return local.slice(0,2) + "…" + "@" + domain;
+  };
+  const digitsOnly = (s) => String(s||"").replace(/\D/g,"");
+  const setPill = (el, cls, txt) => { el.className = "pill" + (cls ? " " + cls : ""); el.textContent = txt; };
+  const show = (el) => el.style.display = "";
+  const hide = (el) => el.style.display = "none";
+  const banner = (kind, msg) => {
+    const b = $("banner");
+    if(!msg) { hide(b); b.textContent=""; b.className="banner"; return; }
+    b.className = "banner " + kind;
+    b.textContent = msg;
+    show(b);
+  };
 
-  function maskEmail(email){
-    if(!email) return "";
-    const s = String(email);
-    const at = s.indexOf("@");
-    if(at <= 1) return s;
-    return s.slice(0,2) + "…" + s.slice(at);
-  }
+  // ==== Elements ====
+  const authPill = $("authPill");
+  const modePill = $("modePill");
+  const eventPill = $("eventPill");
+  const manualHoldBtn = $("manualHold");
+  const holdBar = $("holdBar");
+  const signOutBtn = $("signOutBtn");
 
-  function esc(s){
-    return (s ?? "").toString()
-      .replace(/&/g,"&amp;")
-      .replace(/</g,"&lt;")
-      .replace(/>/g,"&gt;");
-  }
+  const qInput = $("q");
+  const searchStatus = $("searchStatus");
+  const resultsEl = $("results");
+  const resultsScroll = $("resultsScroll");
+  const resultsMeta = $("resultsMeta");
+  const resultsCount = $("resultsCount");
+  const debugDetails = $("debugDetails");
+  const debugOut = $("debugOut");
+  const toggleDebug = $("toggleDebug");
 
-  // Try calling RPC with multiple parameter name variants to avoid guessing.
-  async function rpcTry(fn, variants){
-    let lastErr = null;
-    for(const args of variants){
-      const { data, error } = await supabase.rpc(fn, args);
-      if(!error) return { data, argsUsed: args };
-      lastErr = error;
+  const selTitle = $("selTitle");
+  const selSub = $("selSub");
+  const modePhone = $("modePhone");
+  const modeEmail = $("modeEmail");
+  const phoneBlock = $("phoneBlock");
+  const emailBlock = $("emailBlock");
+  const phoneLast4 = $("phoneLast4");
+  const emailPrefix = $("emailPrefix");
+  const confirmBtn = $("confirmBtn");
+  const nextGuest = $("nextGuest");
+  const nextGuestTop = $("nextGuestTop");
+
+  // ==== State ====
+  let activeEventId = null;
+  let isManual = false;
+  let debugOn = false;
+  let lastCandidates = [];
+  let selected = null;
+  let verifyMode = "phone"; // phone | email
+
+  // ==== Auth ====
+  async function ensureAuth() {
+    const { data } = await sb.auth.getSession();
+    const email = data?.session?.user?.email || null;
+    if(email) {
+      setPill(authPill, "good", "Signed in");
+      authPill.title = email;
+      return true;
     }
-    return { data: null, error: lastErr };
+    setPill(authPill, "bad", "Not signed in");
+    authPill.title = "";
+    // If you have a separate login page, redirect here.
+    return false;
   }
 
-  // ==== Auth/UI ====
-  async function refreshSessionUI(){
-    const { data } = await supabase.auth.getSession();
-    const session = data.session;
-    if(session){
-      setPill(authPill, "ok", "Signed in");
-      authMsg.textContent = "";
-    } else {
-      setPill(authPill, "", "Signed out");
-    }
-    return session;
+  async function signOut() {
+    try { await sb.auth.signOut(); } catch(_e) {}
+    location.reload();
   }
 
-  async function resolveActiveEvent(){
-    activeEventId = null;
-    setPill(eventPill, "warn", "Event: resolving…");
-
-    // door_get_active_event_id() likely returns uuid or null
-    const { data, error } = await supabase.rpc("door_get_active_event_id");
-    if(error){
-      setPill(eventPill, "bad", "Event: error");
-      banner(searchStatus, "bad", "Cannot resolve active event (RPC error).");
-      showResult(false, { ok:false, code:"active_event_error", error });
-      return null;
+  // ==== Active event ====
+  async function resolveActiveEvent() {
+    // Uses RPC if available (no assumptions about schema)
+    try {
+      const { data, error } = await sb.rpc("door_get_active_event_id");
+      if(error) throw error;
+      activeEventId = data || null;
+    } catch (e) {
+      activeEventId = null;
     }
-
-    if(!data){
-      setPill(eventPill, "warn", "Event: none active");
-      return null;
-    }
-
-    activeEventId = data;
-    setPill(eventPill, "ok", "Event: active");
+    eventPill.textContent = "Event: " + (activeEventId ? activeEventId : "none");
     return activeEventId;
   }
 
-  // ==== Manual hold-to-toggle ====
-  let holdTimer = null;
+  // ==== Manual mode hold toggle ====
   const HOLD_MS = 800;
+  let holdTimer = null;
+  let holdStart = 0;
 
-  function setManualUI(){
-    manualToggleBtn.textContent = manualEnabled ? "Manual: ON" : "Manual: OFF";
-    manualCard.style.display = manualEnabled ? "" : "none";
-    if(!manualEnabled){
-      hide(verifyCard);
-      hide(candidatesWrap);
-      hide(searchStatus);
-    }
-    if(!manualEnabled){
-      modeMsg.textContent = "Manual lookup is OFF.";
+  function setManual(on) {
+    isManual = on;
+    modePill.textContent = "Mode: " + (isManual ? "Manual" : "Scanner");
+    qInput.disabled = !isManual;
+    if(!isManual) {
+      // When leaving manual, clear search & selection to avoid stale info
+      clearAll();
     } else {
-      modeMsg.textContent = "Manual lookup is ON. Use only when scanning fails.";
+      qInput.focus();
     }
   }
 
-  function enableManual(){
-    manualEnabled = true;
-    setManualUI();
-  }
-  function disableManual(){
-    manualEnabled = false;
-    setManualUI();
-  }
-  function toggleManual(){
-    manualEnabled = !manualEnabled;
-    setManualUI();
-  }
-
-  manualToggleBtn.addEventListener("contextmenu", (e) => e.preventDefault());
-  manualToggleBtn.addEventListener("touchstart", (e) => {
-    e.preventDefault();
-    holdTimer = setTimeout(() => toggleManual(), HOLD_MS);
-  }, { passive:false });
-  manualToggleBtn.addEventListener("touchend", () => { if(holdTimer) clearTimeout(holdTimer); holdTimer=null; });
-  manualToggleBtn.addEventListener("mousedown", () => { holdTimer = setTimeout(() => toggleManual(), HOLD_MS); });
-  manualToggleBtn.addEventListener("mouseup",   () => { if(holdTimer) clearTimeout(holdTimer); holdTimer=null; });
-  manualToggleBtn.addEventListener("mouseleave",() => { if(holdTimer) clearTimeout(holdTimer); holdTimer=null; });
-
-  // ==== Verify toggles ====
-  useEmailInstead.addEventListener("click", (e) => {
-    e.preventDefault();
-    verifyPhoneBlock.style.display = "none";
-    verifyEmailBlock.style.display = "";
-    hide(verifyMsg);
-  });
-  usePhoneInstead.addEventListener("click", (e) => {
-    e.preventDefault();
-    verifyEmailBlock.style.display = "none";
-    verifyPhoneBlock.style.display = "";
-    hide(verifyMsg);
+  manualHoldBtn.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    holdStart = Date.now();
+    holdBar.style.width = "0%";
+    holdTimer = setInterval(() => {
+      const t = Math.min(1, (Date.now()-holdStart)/HOLD_MS);
+      holdBar.style.width = Math.round(t*100) + "%";
+      if(t>=1) {
+        clearInterval(holdTimer);
+        holdTimer = null;
+        holdBar.style.width = "100%";
+        // toggle manual
+        setManual(!isManual);
+        // reset bar after a short moment
+        setTimeout(() => { holdBar.style.width = "0%"; }, 150);
+      }
+    }, 16);
   });
 
-  // ==== Candidate rendering ====
-  function renderCandidates(cands){
-    // Tolerate either an array or an object like { ok:true, candidates:[...] }
-    const arr = (Array.isArray(cands) ? cands : (cands && typeof cands === "object" && Array.isArray(cands.candidates) ? cands.candidates : []));
-    lastCandidates = arr;
-    if(lastCandidates.length === 0){
-      hide(candidatesWrap);
-      banner(searchStatus, "warn", "No matches. Try more letters (or email prefix).");
-      return;
+  function cancelHold() {
+    if(holdTimer) {
+      clearInterval(holdTimer);
+      holdTimer = null;
     }
-    candidatesEl.innerHTML = "";
-    candidatesWrap.style.display = "";
-
-    // Cap results to reduce overload
-    const shown = lastCandidates.slice(0, 25);
-
-    for(const c of shown){
-      const rid = c.registration_id || c.id || c.registrationId || "";
-      const name = c.full_name || c.name || c.fullName || "(no name)";
-      // door_search_candidates returns masked_email + phone_present (no raw email/phone)
-      const masked = c.masked_email || c.maskedEmail || c.email_masked || "";
-      const email = c.email || c.guest_email || "";
-      const phonePresent = (c.phone_present ?? c.phonePresent ?? null);
-      const phone = c.phone_e164 || c.phone || "";
-      const rem = (c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null);
-      const lastCheckin = (c.last_checkin_at ?? c.lastCheckinAt ?? null);
-      const metaBits = [];
-      if(masked) metaBits.push(masked);
-      else if(email) metaBits.push(maskEmail(email));
-      if(phonePresent === true || phone) metaBits.push("📱");
-      if(rem !== null && rem !== undefined){
-        if(Number(rem) <= 0){
-          metaBits.push("ALREADY CHECKED IN");
-        } else {
-          metaBits.push("entries: " + rem);
-        }
-      }
-      if(lastCheckin && (rem !== null && rem !== undefined) && Number(rem) <= 0){
-        metaBits.push("at " + String(lastCheckin).replace('T',' ').replace('Z',''));
-      }
-
-      const div = document.createElement("div");
-      div.className = "cand";
-      div.innerHTML = `
-        <div class="name">${esc(name)}</div>
-        <div class="meta">${esc(metaBits.join(" • "))}</div>
-      `;
-      div.onclick = () => selectCandidate(c);
-      candidatesEl.appendChild(div);
-    }
-
-    banner(searchStatus, "good", `Found ${lastCandidates.length} match(es). Tap the best one.`);
+    holdBar.style.width = "0%";
   }
+  manualHoldBtn.addEventListener("pointerup", cancelHold);
+  manualHoldBtn.addEventListener("pointercancel", cancelHold);
+  manualHoldBtn.addEventListener("pointerleave", cancelHold);
 
-  function selectCandidate(c){
-    selectedCandidate = c;
-    const name = c.full_name || c.name || "(no name)";
-    const email = c.email || c.guest_email || "";
-    const masked = c.masked_email || c.maskedEmail || "";
-    const phonePresent = (c.phone_present ?? c.phonePresent ?? false);
-    const rid = c.registration_id || c.id || "";
-    const rem = (c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null);
-    const lastCheckin = (c.last_checkin_at ?? c.lastCheckinAt ?? null);
+  // ==== Debug toggle ====
+  toggleDebug.addEventListener("click", () => {
+    debugOn = !debugOn;
+    debugDetails.style.display = debugOn ? "" : "none";
+  });
 
-    let statusLine = "";
-    if(rem !== null && rem !== undefined && Number(rem) <= 0){
-      statusLine = " • ALREADY CHECKED IN" + (lastCheckin ? (" • " + String(lastCheckin).replace('T',' ').replace('Z','')) : "");
-    } else if(rem !== null && rem !== undefined){
-      statusLine = " • entries remaining: " + rem;
-    }
-
-    const shownEmail = masked ? masked : maskEmail(email);
-    selectedMeta.innerHTML = `Selected: <b>${esc(name)}</b> <span class="muted">(${esc(shownEmail)})</span><div class="muted" style="margin-top:6px;">${esc(rid)}${esc(statusLine)}</div>`;
-
-    // Reduce scroll/clutter: once selected, hide list and bring Verify card into view
-    candidatesWrap.style.display = "none";
-    setTimeout(() => {
-      try{ verifyCard.scrollIntoView({ behavior: "smooth", block: "start" }); }catch(_e){}
-    }, 50);
-    verifyCard.style.display = "";
-    // Default verifier based on whether phone exists for this registration
-    if(phonePresent){
-      verifyPhoneBlock.style.display = "";
-      verifyEmailBlock.style.display = "none";
-    } else {
-      verifyPhoneBlock.style.display = "none";
-      verifyEmailBlock.style.display = "";
-    }
+  // ==== Verify mode toggle ====
+  function setVerifyMode(mode) {
+    verifyMode = mode;
+    modePhone.classList.toggle("on", verifyMode==="phone");
+    modeEmail.classList.toggle("on", verifyMode==="email");
+    phoneBlock.style.display = verifyMode==="phone" ? "" : "none";
+    emailBlock.style.display = verifyMode==="email" ? "" : "none";
+    // clear inputs when switching to reduce accidental mixed data
     phoneLast4.value = "";
     emailPrefix.value = "";
-    hide(verifyMsg);
+    banner("", "");
+  }
+  modePhone.addEventListener("click", () => setVerifyMode("phone"));
+  modeEmail.addEventListener("click", () => setVerifyMode("email"));
 
-    // Keep the workflow tight on mobile
-    try{ verifyCard.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_e){}
+  // ==== Candidate rendering ====
+  function candidateHasPhone(c) {
+    return !!(c.phone_e164 || c.phone || c.phone_present || c.has_phone || c.phonePresent);
+  }
+  function getEntriesRemaining(c) {
+    const rem = c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null;
+    return rem === null || rem === undefined ? null : Number(rem);
+  }
+  function getLastCheckin(c) {
+    return c.last_checkin_at ?? c.lastCheckinAt ?? null;
+  }
 
-    if(rem !== null && rem !== undefined && Number(rem) <= 0){
+  function renderCandidates(arr) {
+    lastCandidates = Array.isArray(arr) ? arr : [];
+    resultsEl.innerHTML = "";
+    if(!lastCandidates.length) {
+      resultsMeta.textContent = "No matches.";
+      resultsCount.textContent = "";
+      hide(resultsScroll);
+      return;
+    }
+    resultsMeta.textContent = "Matches";
+    resultsCount.textContent = String(lastCandidates.length);
+    show(resultsScroll);
+
+    for(const c of lastCandidates) {
+      const name = c.full_name || c.name || "(no name)";
+      const email = c.email || c.guest_email || c.masked_email || "";
+      const id = c.registration_id || c.id || "";
+      const rem = getEntriesRemaining(c);
+      const last = getLastCheckin(c);
+      const hasPhone = candidateHasPhone(c);
+
+      const row = document.createElement("div");
+      row.className = "cand";
+
+      const left = document.createElement("div");
+      left.className = "left";
+      left.innerHTML = `
+        <div class="name">${esc(name)}</div>
+        <div class="meta">
+          <span class="tag">${esc(maskEmail(email))}</span>
+          ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
+          ${(rem !== null && rem <= 0) ? '<span class="tag warn">ALREADY CHECKED IN</span>' : (rem !== null ? '<span class="tag">entries: ' + esc(rem) + '</span>' : '')}
+          ${(rem !== null && rem <= 0 && last) ? '<span class="tag">at ' + esc(String(last).replace('T',' ').replace('Z','')) + '</span>' : ''}
+        </div>
+      `;
+
+      const right = document.createElement("div");
+      right.className = "right";
+      const btn = document.createElement("button");
+      btn.textContent = "Select";
+      btn.className = "primary";
+      btn.addEventListener("click", () => selectCandidate(c));
+      right.appendChild(btn);
+
+      row.appendChild(left);
+      row.appendChild(right);
+      resultsEl.appendChild(row);
+    }
+  }
+
+  function selectCandidate(c) {
+    selected = c;
+    const name = c.full_name || c.name || "(no name)";
+    const email = c.email || c.guest_email || c.masked_email || "";
+    const id = c.registration_id || c.id || "";
+    const rem = getEntriesRemaining(c);
+    const last = getLastCheckin(c);
+    const hasPhone = candidateHasPhone(c);
+
+    selTitle.textContent = name;
+    let sub = id + " • " + (email ? maskEmail(email) : "no email");
+    if(rem !== null && rem <= 0) sub += " • ALREADY CHECKED IN" + (last ? (" • " + String(last).replace('T',' ').replace('Z','')) : "");
+    selSub.textContent = sub;
+
+    // If already checked in, disable confirm to prevent mistakes
+    if(rem !== null && rem <= 0) {
       confirmBtn.disabled = true;
-      confirmBtn.style.opacity = "0.6";
-      banner(verifyMsg, "warn", "Already checked in. Do not re-check-in.");
+      banner("warn", "Already checked in. Do not re-check-in.");
     } else {
       confirmBtn.disabled = false;
-      confirmBtn.style.opacity = "1";
-    }
-  }
-
-  // ==== Search (event-scoped only) ====
-  let lastQuery = "";
-  let searchTimer = null;
-
-  async function doSearch(){
-    hide(verifyCard);
-    hide(verifyMsg);
-    selectedCandidate = null;
-
-    const session = await refreshSessionUI();
-    if(!session){
-      banner(searchStatus, "bad", "Sign in required.");
-      showResult(false, { ok:false, code:"not_signed_in" });
-      return;
+      banner("", "");
     }
 
-    if(!manualEnabled){
-      banner(searchStatus, "warn", "Manual lookup is OFF. Hold the toggle to enable.");
-      return;
-    }
-
-    if(!activeEventId){
-      await resolveActiveEvent();
-    }
-    if(!activeEventId){
-      banner(searchStatus, "bad", "No active event. Manual lookup disabled.");
-      showResult(false, { ok:false, code:"no_active_event" });
-      return;
-    }
-
-    const q = (qInput.value || "").trim();
-    if(q.length < 1){
-      banner(searchStatus, "warn", "Type at least 1 character.");
-      hide(candidatesWrap);
-      lastCandidates = [];
-      return;
-    }
-    if(q === lastQuery) return;
-    lastQuery = q;
-
-    candidatesWrap.style.display = "";
-    banner(searchStatus, "warn", "Searching…");
-
-    // IMPORTANT: call the scoped overload ONLY
-    // Use multiple param name variants to avoid guessing.
-    const variants = [
-      { p_event_id: activeEventId, p_query: q },
-      { event_id: activeEventId, query: q },
-      { eid: activeEventId, q: q },
-      { p_eid: activeEventId, p_q: q },
-      { _event_id: activeEventId, _query: q },
-    ];
-
-    const { data, error, argsUsed } = await rpcTry("door_search_candidates", variants);
-
-    if(error){
-      banner(searchStatus, "bad", "Search failed (permission or RPC params).");
-      showResult(false, { ok:false, code:"search_failed", error, tried: variants });
-      hide(candidatesWrap);
-      return;
-    }
-
-    // Some deployments return an object: { ok: true, candidates: [...] } (not a raw array).
-// Normalize so the UI always renders an array.
-const raw = data;
-const normalized = (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.candidates))
-  ? raw.candidates
-  : raw;
-
-showResult(true, { ok:true, args_used: argsUsed, candidates: raw });
-renderCandidates(normalized);
-  }
-
-  // ==== Confirm check-in ====
-  async function doConfirm(){
-    const session = await refreshSessionUI();
-    if(!session){
-      banner(verifyMsg, "bad", "Sign in required.");
-      showResult(false, { ok:false, code:"not_signed_in" });
-      return;
-    }
-    if(!activeEventId){
-      await resolveActiveEvent();
-    }
-    if(!activeEventId){
-      banner(verifyMsg, "bad", "No active event.");
-      showResult(false, { ok:false, code:"no_active_event" });
-      return;
-    }
-    if(!selectedCandidate){
-      banner(verifyMsg, "warn", "Select a candidate first.");
-      return;
-    }
-
-    const rid = selectedCandidate.registration_id || selectedCandidate.id;
-    if(!rid){
-      banner(verifyMsg, "bad", "Candidate missing registration_id.");
-      showResult(false, { ok:false, code:"missing_registration_id", candidate: selectedCandidate });
-      return;
-    }
-
-    const usePhone = (verifyPhoneBlock.style.display !== "none");
-    const last4 = (phoneLast4.value || "").trim();
-    const ep = (emailPrefix.value || "").trim();
-
-    if(usePhone){
-      if(last4.length !== 4){
-        banner(verifyMsg, "warn", "Enter phone last 4.");
-        return;
-      }
+    // Pick best verifier by default
+    if(hasPhone) {
+      setVerifyMode("phone");
     } else {
-      if(ep.length < 2){
-        banner(verifyMsg, "warn", "Enter at least 2 letters of email prefix.");
-        return;
-      }
+      setVerifyMode("email");
+      banner("warn", "No phone on file for this guest. Use email prefix.");
     }
 
-    banner(verifyMsg, "warn", "Verifying…");
-
-    // Call door_confirm_candidate via RPC (preferred, avoids Edge Function ambiguity)
-    const variants = [
-      { p_event_id: activeEventId, p_registration_id: rid, p_phone_last4: usePhone ? last4 : None, p_email_prefix: usePhone ? None : ep },
-      { event_id: activeEventId, registration_id: rid, phone_last4: usePhone ? last4 : None, email_prefix: usePhone ? None : ep },
-      { eid: activeEventId, rid: rid, phone_last4: usePhone ? last4 : None, email_prefix: usePhone ? None : ep },
-    ];
-
-    // JS doesn't have None; patch by converting "None" literals to null in string later; easiest: build manually
+    // Collapse the list a bit on mobile after selection (reduce overload)
+    // (List remains available—just scroll position improves)
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 60);
   }
 
-  // We'll implement confirm via Edge Function to avoid param-name uncertainty for confirm_candidate.
-  async function doConfirmViaEdge(){
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
+  // ==== Live search (debounced) ====
+  let searchTimer = null;
+  let lastQuery = "";
+  const DEBOUNCE_MS = 220;
 
-    const rid = selectedCandidate.registration_id || selectedCandidate.id;
-    const usePhone = (verifyPhoneBlock.style.display !== "none");
-    const last4 = (phoneLast4.value || "").trim();
-    const ep = (emailPrefix.value || "").trim();
+  async function rpcSearchCandidates(eventId, q) {
+    // Try common variants. We do not assume exact arg names.
+    const attempts = [
+      { fn:"door_search_candidates", args: { p_event_id: eventId, p_query: q } },
+      { fn:"door_search_candidates", args: { event_id: eventId, query: q } },
+      { fn:"door_search_candidates", args: { p_event_id: eventId, q: q } },
+      { fn:"door_search_candidates", args: { p_query: q } },
+      { fn:"door_search_candidates", args: { query: q } },
+      { fn:"door_search_candidates", args: { q: q } },
+    ];
+    let lastErr = null;
+    for(const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if(error) throw error;
+        return { ok:true, data, used:a.args };
+      } catch(e) {
+        lastErr = e;
+      }
+    }
+    return { ok:false, error:lastErr };
+  }
+
+  async function doSearchNow() {
+    const q = qInput.value.trim();
+    lastQuery = q;
+    if(!isManual) return;
+
+    if(q.length < 2) {
+      resultsMeta.textContent = "Type 2+ chars.";
+      resultsCount.textContent = "";
+      resultsEl.innerHTML = "";
+      hide(resultsScroll);
+      hide(searchStatus);
+      return;
+    }
+
+    show(searchStatus);
+    searchStatus.textContent = "Searching…";
+    await resolveActiveEvent();
+
+    const res = await rpcSearchCandidates(activeEventId, q);
+    if(!res.ok) {
+      searchStatus.textContent = "Search failed.";
+      banner("bad", "Search failed. (Check RPC permissions / active event.)");
+      debugOut.textContent = JSON.stringify({ ok:false, error: String(res.error?.message || res.error || "unknown") }, null, 2);
+      renderCandidates([]);
+      return;
+    }
+
+    // Normalize: may return array or object {ok,candidates:[...]} depending on RPC wrapper
+    const raw = res.data;
+    const normalized = (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.candidates)) ? raw.candidates : raw;
+    const arr = Array.isArray(normalized) ? normalized : [];
+
+    searchStatus.textContent = "Done.";
+    hide(searchStatus);
+
+    debugOut.textContent = JSON.stringify({ ok:true, used: res.used, count: arr.length, raw: raw }, null, 2);
+    renderCandidates(arr);
+  }
+
+  qInput.addEventListener("input", () => {
+    if(searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(doSearchNow, DEBOUNCE_MS);
+  });
+
+  // ==== Confirm check-in (via edge) ====
+  async function doConfirm() {
+    if(!selected) { banner("warn", "Select a guest first."); return; }
+    const rem = getEntriesRemaining(selected);
+    if(rem !== null && rem <= 0) { banner("warn", "Already checked in. Do not re-check-in."); return; }
+
+    const rid = selected.registration_id || selected.id;
+    if(!rid) { banner("bad", "Missing registration id."); return; }
+
+    const usePhone = verifyMode === "phone";
+    const last4 = digitsOnly(phoneLast4.value).slice(-4);
+    const ep = emailPrefix.value.trim();
+
+    if(usePhone) {
+      if(last4.length < 3) { banner("warn", "Enter last 4 digits."); return; }
+    } else {
+      if(ep.length < 2) { banner("warn", "Enter email prefix."); return; }
+    }
+
+    confirmBtn.disabled = true;
+    banner("", "");
+
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token || "";
 
     const payload = {
-      action: "confirm_candidate",
       registration_id: rid,
       phone_last4: usePhone ? last4 : null,
       email_prefix: usePhone ? null : ep
     };
 
-    const res = await fetch(SUPABASE_URL + "/functions/v1/door_checkin", {
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Authorization": token ? ("Bearer " + token) : ""
-      },
-      body: JSON.stringify(payload)
-    });
+    let json = null;
+    try {
+      const resp = await fetch(SUPABASE_URL + "/functions/v1/door_checkin", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization": token ? ("Bearer " + token) : ""
+        },
+        body: JSON.stringify(payload)
+      });
+      json = await resp.json().catch(() => ({ ok:false, code:"bad_json" }));
 
-    let json;
-    try { json = await res.json(); } catch { json = { ok:false, code:"bad_json" }; }
-
-    if(res.ok && json.ok){
-      banner(verifyMsg, "good", "Checked in. Tap Next guest.");
-      showResult(true, json);
-    } else {
-      if(json && json.code === "already_checked_in"){
-        const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
-        banner(verifyMsg, "warn", "Already checked in" + at + ".");
-      } else if(json && json.code === "not_verified"){
-        banner(verifyMsg, "warn", "Not verified. Try again (or use the other method).");
-      } else if(json && json.code === "no_active_event"){
-        banner(verifyMsg, "bad", "No active event.");
-      } else if(json && json.code){
-        banner(verifyMsg, "warn", json.code + ".");
+      // Surface outcomes clearly but not humiliatingly
+      if(resp.ok && json.ok) {
+        banner("good", "Checked in. Next guest.");
+        // Haptic / vibration if available (subtle)
+        try { if(navigator.vibrate) navigator.vibrate(30); } catch(_e) {}
+        // Refresh the selected card state so "already checked in" appears on immediate re-search
+        await doSearchNow();
       } else {
-        banner(verifyMsg, "warn", "Not verified. Try again.");
+        if(json?.code === "already_checked_in") {
+          const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
+          banner("warn", "Already checked in" + at + ".");
+        } else if(json?.code === "not_verified") {
+          banner("warn", "Not verified. Try again.");
+        } else if(json?.code === "email_prefix_required") {
+          banner("warn", "Email prefix required for this guest.");
+        } else if(json?.code === "phone_last4_required") {
+          banner("warn", "Phone last 4 required for this guest.");
+        } else if(json?.code === "no_active_event") {
+          banner("bad", "No active event.");
+        } else {
+          banner("warn", (json?.code ? (json.code + ".") : "Not verified. Try again."));
+        }
       }
-      showResult(false, json);
+
+      debugOut.textContent = JSON.stringify({ edge_response: json, payload_sent: payload }, null, 2);
+    } catch (e) {
+      banner("bad", "Network error.");
+      debugOut.textContent = JSON.stringify({ ok:false, error: String(e?.message || e) }, null, 2);
+    } finally {
+      // Re-enable unless already checked-in (still allow next guest)
+      confirmBtn.disabled = false;
     }
   }
 
-  // ==== Wire up ====
-  document.getElementById("signIn").onclick = async () => {
-    authMsg.textContent = "";
-    const email = (el("email").value || "").trim();
-    const password = el("password").value || "";
-    if(!email || !password){
-      authMsg.textContent = "Enter email + password.";
-      return;
-    }
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if(error){
-      authMsg.textContent = "Sign-in failed.";
-      showResult(false, { ok:false, code:"sign_in_failed", error });
-      return;
-    }
-    await refreshSessionUI();
-    await resolveActiveEvent();
-  };
+  confirmBtn.addEventListener("click", doConfirm);
 
-  document.getElementById("signOut").onclick = async () => {
-    await supabase.auth.signOut();
-    await refreshSessionUI();
-    activeEventId = null;
-    setPill(eventPill, "warn", "Event: unknown");
-  };
+  // ==== Clear / Next guest ====
+  function clearAll() {
+    // search + results
+    qInput.value = "";
+    lastQuery = "";
+    resultsEl.innerHTML = "";
+    lastCandidates = [];
+    resultsMeta.textContent = "No search yet.";
+    resultsCount.textContent = "";
+    hide(resultsScroll);
+    hide(searchStatus);
+    // selection
+    selected = null;
+    selTitle.textContent = "No guest selected";
+    selSub.textContent = "Select a guest from the list above.";
+    confirmBtn.disabled = true;
+    // inputs
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    banner("", "");
+    debugOut.textContent = "{}";
+  }
 
-  searchBtn.onclick = doSearch;
-  nextBtn.onclick = clearForNext;
-  confirmBtn.onclick = doConfirmViaEdge;
-
-  // Enter key triggers search
-  qInput.addEventListener("keydown", (e) => {
-    if(e.key === "Enter"){ e.preventDefault(); doSearch(); }
+  nextGuest.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
+  nextGuestTop.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
   });
 
-  // Live search (debounced) so the list updates as you type
-  qInput.addEventListener("input", () => {
-    if(!manualEnabled) return;
-    if(searchTimer) clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => { doSearch().catch(()=>{}); }, 250);
-  });
-
-  // Initial UI
-  setManualUI();
-  showResult(true, { ok:true, note:"Ready" });
+  // ==== Init ====
+  signOutBtn.addEventListener("click", signOut);
 
   (async () => {
-    await refreshSessionUI();
-    // Attempt to resolve active event if already signed in
-    const { data } = await supabase.auth.getSession();
-    if(data.session){
-      await resolveActiveEvent();
-    }
+    const authed = await ensureAuth();
+    await resolveActiveEvent();
+
+    // Default: scanner mode (manual disabled)
+    setManual(false);
+    setVerifyMode("phone");
   })();
+
 })();
 </script>
+
 </body>
 </html>
