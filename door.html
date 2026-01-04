@@ -1,187 +1,805 @@
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VoidPass — Door</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg:#0b1020;
+      --panel:rgba(255,255,255,.06);
+      --panel2:rgba(255,255,255,.08);
+      --border:rgba(255,255,255,.10);
+      --text:#e8eefc;
+      --muted:rgba(232,238,252,.75);
+      --good:rgba(16,185,129,.18);
+      --warn:rgba(245,158,11,.18);
+      --bad:rgba(239,68,68,.20);
+      --goodStroke:rgba(16,185,129,.55);
+      --warnStroke:rgba(245,158,11,.55);
+      --badStroke:rgba(239,68,68,.55);
+      --pill:rgba(255,255,255,.10);
+      --shadow: 0 10px 35px rgba(0,0,0,.35);
+      --r:16px;
+      --pad:14px;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    }
+    * { box-sizing:border-box; }
+    html,body { height:100%; }
+    body {
+      margin:0;
+      background: radial-gradient(1000px 600px at 30% 0%, rgba(56,189,248,.14), transparent 60%),
+                  radial-gradient(900px 600px at 80% 20%, rgba(167,139,250,.12), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 90px) 10px;
+    }
+    .wrap { max-width: 820px; margin:0 auto; }
+    .topbar {
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      padding: 10px 12px;
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      position: sticky; top: 10px; z-index: 5;
+      backdrop-filter: blur(10px);
+    }
+    .brand { font-weight:700; letter-spacing:.2px; }
+    .pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .pill {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius:999px;
+      background: var(--pill);
+      border:1px solid var(--border);
+      color: var(--muted);
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pill.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    .pill.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    .pill.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+    .grid { display:grid; gap:12px; margin-top:12px; }
+    .card {
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      padding: var(--pad);
+    }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input[type="text"], input[type="password"] {
+      width:100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      outline:none;
+      font-size:16px;
+    }
+    input::placeholder { color: rgba(232,238,252,.45); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row > * { flex: 1 1 auto; }
+    button {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor:pointer;
+      user-select:none;
+      touch-action:manipulation;
+    }
+    button.primary { background: rgba(56,189,248,.18); border-color: rgba(56,189,248,.40); }
+    button.danger { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.45); }
+    button.good { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.45); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .tiny { color: var(--muted); font-size: 12px; }
+    .sep { height:1px; background: rgba(255,255,255,.10); margin: 12px 0; }
 
-type Json = Record<string, unknown>;
-const json = (s: number, b: Json) =>
-  new Response(JSON.stringify(b), {
-    status: s,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
+    /* Live results list */
+    .resultsHeader { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .results { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+    .cand {
+      padding: 12px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.22);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .cand:active { transform: translateY(1px); }
+    .cand .left { min-width: 0; }
+    .cand .name { font-weight:700; font-size:16px; line-height:1.15; }
+    .cand .meta { margin-top:6px; color: var(--muted); font-size: 12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .tag {
+      padding: 4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .tag.warn { border-color: var(--warnStroke); background: var(--warn); color:#fff4d7; }
+    .tag.good { border-color: var(--goodStroke); background: var(--good); color:#d9fff1; }
+    .tag.bad  { border-color: var(--badStroke);  background: var(--bad);  color:#ffe0e0; }
+    .cand .right { text-align:right; }
+    .cand button { padding: 10px 12px; border-radius: 12px; }
+    .scroll { max-height: 55vh; overflow:auto; padding-right:2px; }
+    @media (max-height: 760px) {
+      .scroll { max-height: 48vh; }
+    }
+
+    /* Bottom sheet verify */
+    .sheet {
+      position: fixed;
+      left: 0; right:0; bottom: 0;
+      padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px) 10px;
+      z-index: 10;
+    }
+    .sheetInner {
+      max-width: 820px; margin:0 auto;
+      background: rgba(11,16,32,.92);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: 0 14px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      padding: 12px;
+    }
+    .sheetTop { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .selectedLine { min-width:0; }
+    .selectedLine .title { font-weight:800; font-size: 14px; }
+    .selectedLine .sub { margin-top:4px; color: var(--muted); font-size: 12px; }
+    .modePills { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .modePills button { padding: 9px 10px; font-size:12px; }
+    .modePills .on { background: rgba(56,189,248,.22); border-color: rgba(56,189,248,.45); }
+    .sheetControls { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+    .sheetControls .full { grid-column: 1 / -1; }
+    .banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .banner.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    .banner.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    .banner.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
+    details summary { cursor:pointer; color: var(--muted); font-size: 12px; }
+    pre {
+      white-space: pre-wrap;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 10px;
+      font-size: 12px;
+      color: rgba(232,238,252,.82);
+      margin: 8px 0 0 0;
+    }
+
+    /* Manual mode hold */
+    .holdBtn { position:relative; }
+    .holdBtn .bar {
+      position:absolute; left:10px; right:10px; bottom:8px; height:3px;
+      border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;
+      opacity:.9;
+    }
+    .holdBtn .bar > i {
+      display:block; height:100%; width:0%;
+      background: rgba(56,189,248,.65);
+    }
+  
+  /* Prevent sticky bottom sheet from covering candidate list */
+  #candidatesWrap { padding-bottom: 220px; }
+  @media (max-width: 520px){
+    #candidatesWrap { padding-bottom: 260px; }
+  }
+  /* Keep sheet from being overly tall */
+  #verifySheet { max-height: 40vh; }
+
+
+  #verifySheet.min { max-height: 56px !important; overflow: hidden; }
+  #verifySheet.min .sheetBody { display: none; }
+
+
+  :root{ --sheetH: 220px; }
+
+  /* Candidate area becomes scrollable above the fixed sheet */
+  #candidatesWrap{
+    padding-bottom: 12px !important;
+    margin-bottom: var(--sheetH);
+  }
+  #candidates{
+    max-height: calc(100vh - var(--sheetH) - 180px);
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div>
+        <div class="brand">VoidPass — Door</div>
+        <div class="tiny" id="eventPill">Event: …</div>
+      </div>
+      <div class="pills">
+        <div class="pill" id="authPill">Auth: …</div>
+        <div class="pill" id="modePill">Mode: Scanner</div>
+        <button id="manualHold" class="holdBtn" title="Hold to enable manual lookup">Hold: Manual<div class="bar"><i id="holdBar"></i></div></button>
+        <button id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card" id="scanCard">
+        <div class="resultsHeader">
+          <div>
+            <div style="font-weight:800;">Manual fallback (search)</div>
+            <div class="muted">Hold “Manual” to enable. Type 2+ chars. List updates as you type.</div>
+          </div>
+          <div class="row" style="justify-content:flex-end; gap:8px;">
+            <button id="nextGuestTop" class="good">Next guest</button>
+            <button id="toggleDebug">Debug</button>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+
+        <label for="q">Search guest</label>
+        <input id="q" type="text" placeholder="Start typing name / email / digits…" autocomplete="off" inputmode="text" disabled />
+
+        <div class="muted" id="searchStatus" style="margin-top:8px; display:none;"></div>
+
+        <div class="results" style="margin-top:12px;">
+          <div class="resultsHeader">
+            <div class="muted" id="resultsMeta">No search yet.</div>
+            <div class="muted" id="resultsCount"></div>
+          </div>
+
+          <div class="scroll" id="resultsScroll" style="display:none;">
+            <div id="results"></div>
+          </div>
+        </div>
+
+        <details id="debugDetails" style="display:none; margin-top:12px;">
+          <summary>Result JSON (for debugging)</summary>
+          <pre id="debugOut">{}</pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+  <div class="sheet" id="sheet" id="verifySheet">
+    <div class="sheetInner">
+      <div class="sheetTop">
+        <div class="selectedLine">
+          <div class="title" id="selTitle">No guest selected</div>
+          <div class="sub" id="selSub">Select a guest from the list above.</div>
+        </div>
+        <div class="modePills">
+          <button id="modePhone">Phone last4</button>
+          <button id="modeEmail">Email prefix</button>
+        </div>
+      </div>
+
+      <div class="sheetControls">
+        <div id="phoneBlock">
+          <label for="phoneLast4">Phone last 4 digits</label>
+          <input id="phoneLast4" type="text" placeholder="e.g. 4937" inputmode="numeric" />
+        </div>
+        <div id="emailBlock">
+          <label for="emailPrefix">Email prefix</label>
+          <input id="emailPrefix" type="text" placeholder="e.g. jamie" inputmode="text" />
+        </div>
+        <button id="confirmBtn" class="primary full" disabled>Confirm check-in</button>
+        <button id="nextGuest" class="good">Next guest</button>
+      </div>
+
+      <div id="banner" class="banner" style="display:none;"></div>
+    </div>
+  </div>
+
+<script>
+(() => {
+  // ==== Config ====
+  const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_ma90uwKLz7Igb_xn9nXVwQ_W6k2KfiH";
+
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ==== Helpers ====
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  const maskEmail = (email) => {
+    const e = String(email||"");
+    const at = e.indexOf("@");
+    if(at<=1) return e ? e[0] + "…@" + e.slice(at+1) : "";
+    const local = e.slice(0,at);
+    const domain = e.slice(at+1);
+    return local.slice(0,2) + "…" + "@" + domain;
+  };
+  const digitsOnly = (s) => String(s||"").replace(/\D/g,"");
+  const setPill = (el, cls, txt) => { el.className = "pill" + (cls ? " " + cls : ""); el.textContent = txt; };
+  const show = (el) => el.style.display = "";
+  const hide = (el) => el.style.display = "none";
+  const banner = (kind, msg) => {
+    const b = $("banner");
+    if(!msg) { hide(b); b.textContent=""; b.className="banner"; return; }
+    b.className = "banner " + kind;
+    b.textContent = msg;
+    show(b);
+  };
+
+  // ==== Elements ====
+  const authPill = $("authPill");
+  const modePill = $("modePill");
+  const eventPill = $("eventPill");
+  const manualHoldBtn = $("manualHold");
+  const holdBar = $("holdBar");
+  const signOutBtn = $("signOutBtn");
+
+  const qInput = $("q");
+  const searchStatus = $("searchStatus");
+  const resultsEl = $("results");
+  const resultsScroll = $("resultsScroll");
+  const resultsMeta = $("resultsMeta");
+  const resultsCount = $("resultsCount");
+  const debugDetails = $("debugDetails");
+  const debugOut = $("debugOut");
+  const toggleDebug = $("toggleDebug");
+
+  const selTitle = $("selTitle");
+  const selSub = $("selSub");
+  const modePhone = $("modePhone");
+  const modeEmail = $("modeEmail");
+  const phoneBlock = $("phoneBlock");
+  const emailBlock = $("emailBlock");
+  const phoneLast4 = $("phoneLast4");
+  const emailPrefix = $("emailPrefix");
+  const confirmBtn = $("confirmBtn");
+
+  const verifySheet = document.getElementById('verifySheet');
+
+  function updateSheetH(){
+    if(!verifySheet) return;
+    const h = Math.max(120, Math.min(420, verifySheet.getBoundingClientRect().height));
+    document.documentElement.style.setProperty('--sheetH', h + 'px');
+  }
+  window.addEventListener('resize', updateSheetH);
+  setTimeout(updateSheetH, 50);
+  setTimeout(updateSheetH, 250);
+
+  // Bottom sheet minimize toggle (helps on small screens/keyboard)
+  const sheetToggle = document.getElementById('sheetToggle');
+  let sheetMin = false;
+  if(sheetToggle && verifySheet){
+    sheetToggle.addEventListener('click', () => {
+      sheetMin = !sheetMin;
+      verifySheet.classList.toggle('min', sheetMin);
+      sheetToggle.textContent = sheetMin ? "Expand" : "Minimize";
+    });
+  }
+  const nextGuest = $("nextGuest");
+  const nextGuestTop = $("nextGuestTop");
+
+  // ==== State ====
+  let activeEventId = null;
+  let isManual = false;
+  let debugOn = false;
+  let lastCandidates = [];
+  let selected = null;
+  let verifyMode = "phone"; // phone | email
+
+  // ==== Auth ====
+  async function ensureAuth() {
+    const { data } = await sb.auth.getSession();
+    const email = data?.session?.user?.email || null;
+    if(email) {
+      setPill(authPill, "good", "Signed in");
+      authPill.title = email;
+      return true;
+    }
+    setPill(authPill, "bad", "Not signed in");
+    authPill.title = "";
+    // If you have a separate login page, redirect here.
+    return false;
+  }
+
+  async function signOut() {
+    try { await sb.auth.signOut(); } catch(_e) {}
+    location.reload();
+  }
+
+  // ==== Active event ====
+  async function resolveActiveEvent() {
+    // Uses RPC if available (no assumptions about schema)
+    try {
+      const { data, error } = await sb.rpc("door_get_active_event_id");
+      if(error) throw error;
+      activeEventId = data || null;
+    } catch (e) {
+      activeEventId = null;
+    }
+    eventPill.textContent = "Event: " + (activeEventId ? activeEventId : "none");
+    return activeEventId;
+  }
+
+  // ==== Manual mode hold toggle ====
+  const HOLD_MS = 800;
+  let holdTimer = null;
+  let holdStart = 0;
+
+  function setManual(on) {
+    isManual = on;
+    modePill.textContent = "Mode: " + (isManual ? "Manual" : "Scanner");
+    qInput.disabled = !isManual;
+    if(!isManual) {
+      // When leaving manual, clear search & selection to avoid stale info
+      clearAll();
+    } else {
+      qInput.focus();
+    }
+  }
+
+  manualHoldBtn.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    holdStart = Date.now();
+    holdBar.style.width = "0%";
+    holdTimer = setInterval(() => {
+      const t = Math.min(1, (Date.now()-holdStart)/HOLD_MS);
+      holdBar.style.width = Math.round(t*100) + "%";
+      if(t>=1) {
+        clearInterval(holdTimer);
+        holdTimer = null;
+        holdBar.style.width = "100%";
+        // toggle manual
+        setManual(!isManual);
+        // reset bar after a short moment
+        setTimeout(() => { holdBar.style.width = "0%"; }, 150);
+      }
+    }, 16);
   });
 
-serve(async (req) => {
-  try {
-    if (req.method === "OPTIONS") {
-      return new Response(null, { status: 204, headers: corsHeaders });
+  function cancelHold() {
+    if(holdTimer) {
+      clearInterval(holdTimer);
+      holdTimer = null;
     }
-    if (req.method !== "POST") return json(405, { ok: false, error: "Method not allowed" });
+    holdBar.style.width = "0%";
+  }
+  manualHoldBtn.addEventListener("pointerup", cancelHold);
+  manualHoldBtn.addEventListener("pointercancel", cancelHold);
+  manualHoldBtn.addEventListener("pointerleave", cancelHold);
 
-    const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const ANON = Deno.env.get("SUPABASE_ANON_KEY");
+  // ==== Debug toggle ====
+  toggleDebug.addEventListener("click", () => {
+    debugOn = !debugOn;
+    debugDetails.style.display = debugOn ? "" : "none";
+  });
 
-    // Editable key (new Supabase key system)
-    const SR =
-      Deno.env.get("SERVICE_ROLE_KEY") ??
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  // ==== Verify mode toggle ====
+  function setVerifyMode(mode) {
+    verifyMode = mode;
+    modePhone.classList.toggle("on", verifyMode==="phone");
+    modeEmail.classList.toggle("on", verifyMode==="email");
+    phoneBlock.style.display = verifyMode==="phone" ? "" : "none";
+    emailBlock.style.display = verifyMode==="email" ? "" : "none";
+    // clear inputs when switching to reduce accidental mixed data
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    banner("", "");
+  }
+  modePhone.addEventListener("click", () => setVerifyMode("phone"));
+  modeEmail.addEventListener("click", () => setVerifyMode("email"));
 
-    if (!SUPABASE_URL || !ANON || !SR) {
-      return json(500, { ok: false, error: "Server misconfiguration" });
+  // ==== Candidate rendering ====
+  function candidateHasPhone(c) {
+    return !!(c.phone_e164 || c.phone || c.phone_present || c.has_phone || c.phonePresent);
+  }
+  function getEntriesRemaining(c) {
+    const rem = c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null;
+    return rem === null || rem === undefined ? null : Number(rem);
+  }
+  function getLastCheckin(c) {
+    return c.last_checkin_at ?? c.lastCheckinAt ?? null;
+  }
+
+  function renderCandidates(arr) {
+    lastCandidates = Array.isArray(arr) ? arr : [];
+    resultsEl.innerHTML = "";
+    if(!lastCandidates.length) {
+      resultsMeta.textContent = "No matches.";
+      resultsCount.textContent = "";
+      hide(resultsScroll);
+      return;
+    }
+    resultsMeta.textContent = "Matches";
+    resultsCount.textContent = String(lastCandidates.length);
+    show(resultsScroll);
+
+    for(const c of lastCandidates) {
+      const name = c.full_name || c.name || "(no name)";
+      const email = c.email || c.guest_email || c.masked_email || "";
+      const id = c.registration_id || c.id || "";
+      const rem = getEntriesRemaining(c);
+      const last = getLastCheckin(c);
+      const hasPhone = candidateHasPhone(c);
+
+      const row = document.createElement("div");
+      row.className = "cand";
+
+      const left = document.createElement("div");
+      left.className = "left";
+      left.innerHTML = `
+        <div class="name">${esc(name)}</div>
+        <div class="meta">
+          <span class="tag">${esc(maskEmail(email))}</span>
+          ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
+          ${(rem !== null && rem <= 0) ? '<span class="tag warn">ALREADY CHECKED IN</span>' : (rem !== null ? '<span class="tag">entries: ' + esc(rem) + '</span>' : '')}
+          ${(rem !== null && rem <= 0 && last) ? '<span class="tag">at ' + esc(String(last).replace('T',' ').replace('Z','')) + '</span>' : ''}
+        </div>
+      `;
+
+      const right = document.createElement("div");
+      right.className = "right";
+      const btn = document.createElement("button");
+      btn.textContent = "Select";
+      btn.className = "primary";
+      btn.addEventListener("click", () => selectCandidate(c));
+      right.appendChild(btn);
+
+      row.appendChild(left);
+      row.appendChild(right);
+      resultsEl.appendChild(row);
+    }
+  }
+
+  function selectCandidate(c) {
+    selected = c;
+    const name = c.full_name || c.name || "(no name)";
+    const email = c.email || c.guest_email || c.masked_email || "";
+    const id = c.registration_id || c.id || "";
+    const rem = getEntriesRemaining(c);
+    const last = getLastCheckin(c);
+    const hasPhone = candidateHasPhone(c);
+
+    selTitle.textContent = name;
+    let sub = id + " • " + (email ? maskEmail(email) : "no email");
+    if(rem !== null && rem <= 0) sub += " • ALREADY CHECKED IN" + (last ? (" • " + String(last).replace('T',' ').replace('Z','')) : "");
+    selSub.textContent = sub;
+
+    // If already checked in, disable confirm to prevent mistakes
+    if(rem !== null && rem <= 0) {
+      confirmBtn.disabled = true;
+      banner("warn", "Already checked in. Do not re-check-in.");
+    } else {
+      confirmBtn.disabled = false;
+      banner("", "");
     }
 
-    // Caller identity (JWT from door.html)
-    const supabaseAuth = createClient(SUPABASE_URL, ANON, {
-      global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } },
-    });
+    // Pick best verifier by default
+    if(hasPhone) {
+      setVerifyMode("phone");
+    } else {
+      setVerifyMode("email");
+      banner("warn", "No phone on file for this guest. Use email prefix.");
+    }
 
-    const { data: { user }, error: authErr } = await supabaseAuth.auth.getUser();
-    if (authErr || !user) return json(401, { ok: false, error: "Unauthorized" });
+    // Collapse the list a bit on mobile after selection (reduce overload)
+    // (List remains available—just scroll position improves)
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 60);
+  }
 
-    const emailRaw = user.email;
-    if (!emailRaw) return json(400, { ok: false, error: "User email missing" });
-    const email = emailRaw.trim().toLowerCase();
+  // ==== Live search (debounced) ====
+  let searchTimer = null;
+  let lastQuery = "";
+  const DEBOUNCE_MS = 220;
 
-    // Admin client (RPC + allowlists)
-    const admin = createClient(SUPABASE_URL, SR);
+  async function rpcSearchCandidates(eventId, q) {
+    // Try common variants. We do not assume exact arg names.
+    const attempts = [
+      { fn:"door_search_candidates", args: { p_event_id: eventId, p_query: q } },
+      { fn:"door_search_candidates", args: { event_id: eventId, query: q } },
+      { fn:"door_search_candidates", args: { p_event_id: eventId, q: q } },
+      { fn:"door_search_candidates", args: { p_query: q } },
+      { fn:"door_search_candidates", args: { query: q } },
+      { fn:"door_search_candidates", args: { q: q } },
+    ];
+    let lastErr = null;
+    for(const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if(error) throw error;
+        return { ok:true, data, used:a.args };
+      } catch(e) {
+        lastErr = e;
+      }
+    }
+    return { ok:false, error:lastErr };
+  }
 
-    // Allowlist OR gate (presence = access)
-    const [orgRes, doorRes] = await Promise.all([
-      admin.from("organizer_allowlist").select("email").eq("email", email).maybeSingle(),
-      admin.from("door_staff_allowlist").select("email").eq("email", email).maybeSingle(),
-    ]);
+  async function doSearchNow() {
+    const q = qInput.value.trim();
+    lastQuery = q;
+    if(!isManual) return;
 
-    if (orgRes.error || doorRes.error) {
-      return json(500, {
-        ok: false,
-        error: "Allowlist lookup failed",
-        details: {
-          organizer_error: orgRes.error?.message ?? null,
-          door_error: doorRes.error?.message ?? null,
+    if(q.length < 2) {
+      resultsMeta.textContent = "Type 2+ chars.";
+      resultsCount.textContent = "";
+      resultsEl.innerHTML = "";
+      hide(resultsScroll);
+      hide(searchStatus);
+      return;
+    }
+
+    show(searchStatus);
+    searchStatus.textContent = "Searching…";
+    await resolveActiveEvent();
+
+    const res = await rpcSearchCandidates(activeEventId, q);
+    if(!res.ok) {
+      searchStatus.textContent = "Search failed.";
+      banner("bad", "Search failed. (Check RPC permissions / active event.)");
+      debugOut.textContent = JSON.stringify({ ok:false, error: String(res.error?.message || res.error || "unknown") }, null, 2);
+      renderCandidates([]);
+      return;
+    }
+
+    // Normalize: may return array or object {ok,candidates:[...]} depending on RPC wrapper
+    const raw = res.data;
+    const normalized = (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.candidates)) ? raw.candidates : raw;
+    const arr = Array.isArray(normalized) ? normalized : [];
+
+    searchStatus.textContent = "Done.";
+    hide(searchStatus);
+
+    debugOut.textContent = JSON.stringify({ ok:true, used: res.used, count: arr.length, raw: raw }, null, 2);
+    renderCandidates(arr);
+  }
+
+  qInput.addEventListener("input", () => {
+    if(searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(doSearchNow, DEBOUNCE_MS);
+  });
+
+  // ==== Confirm check-in (via edge) ====
+  async function doConfirm() {
+    if(!selected) { banner("warn", "Select a guest first."); return; }
+    const rem = getEntriesRemaining(selected);
+    if(rem !== null && rem <= 0) { banner("warn", "Already checked in. Do not re-check-in."); return; }
+
+    const rid = selected.registration_id || selected.id;
+    if(!rid) { banner("bad", "Missing registration id."); return; }
+
+    const usePhone = verifyMode === "phone";
+    const last4 = digitsOnly(phoneLast4.value).slice(-4);
+    const ep = emailPrefix.value.trim();
+
+    if(usePhone) {
+      if(last4.length < 3) { banner("warn", "Enter last 4 digits."); return; }
+    } else {
+      if(ep.length < 2) { banner("warn", "Enter email prefix."); return; }
+    }
+
+    confirmBtn.disabled = true;
+    banner("", "");
+
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token || "";
+
+    const payload = {
+      registration_id: rid,
+      phone_last4: usePhone ? last4 : null,
+      email_prefix: usePhone ? null : ep
+    };
+
+    let json = null;
+    try {
+      const resp = await fetch(SUPABASE_URL + "/functions/v1/door_checkin", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization": token ? ("Bearer " + token) : ""
         },
+        body: JSON.stringify(payload)
       });
-    }
+      json = await resp.json().catch(() => ({ ok:false, code:"bad_json" }));
 
-    if (!orgRes.data && !doorRes.data) {
-      return json(403, { ok: false, error: "Forbidden" });
-    }
-
-    const body = await req.json().catch(() => null);
-    if (!body || typeof body !== "object") return json(400, { ok: false, error: "Invalid JSON body" });
-
-    // ---- Search broadly (Phase 3) ----
-    if ((body as any).action === "search_by_name") {
-      const { event_id, full_name } = body as any;
-
-      const { data, error } = await admin.rpc("door_search_candidates", {
-        p_event_id: event_id,
-        p_query: full_name,
-      });
-
-      if (error) return json(500, { ok: false, error: error.message });
-
-      // door_search_candidates returns jsonb
-      return (data as any)?.ok ? json(200, data as any) : json(409, data as any);
-    }
-
-    // ---- Confirm explicitly (Phase 3) ----
-    if ((body as any).action === "confirm_candidate") {
-      const { registration_id, event_id, phone_last4, email_prefix, method } = body as any;
-
-      const { data: v, error: ve } = await admin.rpc("door_verify_identity", {
-        p_registration_id: registration_id,
-        p_event_id: event_id,
-        p_phone_last4: phone_last4,
-        p_email_prefix: email_prefix,
-      });
-
-      if (ve) return json(500, { ok: false, error: ve.message });
-
-      // door_verify_identity historically returned boolean; newer versions return JSON:
-      //   { ok: true/false, verifier: "email_prefix" | "phone_last4", code?: string, ... }
-      // Normalize here so the rest of the flow is stable.
-      let verifyPayload: any = v;
-
-      // If it came back as a JSON string, try parse.
-      if (typeof verifyPayload === "string") {
-        try {
-          verifyPayload = JSON.parse(verifyPayload);
-        } catch {
-          // leave as string
+      // Surface outcomes clearly but not humiliatingly
+      if(resp.ok && json.ok) {
+        banner("good", "Checked in. Next guest.");
+        // Haptic / vibration if available (subtle)
+        try { if(navigator.vibrate) navigator.vibrate(30); } catch(_e) {}
+        // Refresh the selected card state so "already checked in" appears on immediate re-search
+        await doSearchNow();
+      } else {
+        if(json?.code === "already_checked_in") {
+          const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
+          banner("warn", "Already checked in" + at + ".");
+        } else if(json?.code === "not_verified") {
+          banner("warn", "Not verified. Try again.");
+        } else if(json?.code === "email_prefix_required") {
+          banner("warn", "Email prefix required for this guest.");
+        } else if(json?.code === "phone_last4_required") {
+          banner("warn", "Phone last 4 required for this guest.");
+        } else if(json?.code === "no_active_event") {
+          banner("bad", "No active event.");
+        } else {
+          banner("warn", (json?.code ? (json.code + ".") : "Not verified. Try again."));
         }
       }
 
-      if (typeof verifyPayload === "boolean") {
-        verifyPayload = { ok: verifyPayload };
-      }
-
-      const verifyOk =
-        !!verifyPayload && typeof verifyPayload === "object" && !!verifyPayload.ok;
-
-      if (!verifyOk) {
-        // Pass through verification payload/codes (door.html uses phone_missing_use_email_prefix)
-        // Fallback if payload isn't an object.
-        return json(409, (typeof verifyPayload === "object" && verifyPayload)
-          ? verifyPayload
-          : { ok: false, code: "not_verified" });
-      }
-
-      const { data: checkin, error: ce } = await admin.rpc("door_checkin_atomic", {
-        p_registration_id: registration_id,
-        p_method: method ?? "manual",
-      });
-
-      if (ce) return json(500, { ok: false, error: ce.message });
-      return (checkin as any)?.ok ? json(200, checkin as any) : json(409, checkin as any);
+      debugOut.textContent = JSON.stringify({ edge_response: json, payload_sent: payload }, null, 2);
+    } catch (e) {
+      banner("bad", "Network error.");
+      debugOut.textContent = JSON.stringify({ ok:false, error: String(e?.message || e) }, null, 2);
+    } finally {
+      // Re-enable unless already checked-in (still allow next guest)
+      confirmBtn.disabled = false;
     }
-
-    // ---- QR path (existing) ----
-    if ((body as any).action === "qr" || ((body as any).registration_id && (body as any).method && !(body as any).action)) {
-      const { registration_id, method } = body as any;
-      const { data, error } = await admin.rpc("door_checkin_atomic", {
-        p_registration_id: registration_id,
-        p_method: method,
-      });
-      if (error) return json(500, { ok: false, error: error.message });
-      return (data as any)?.ok ? json(200, data as any) : json(409, data as any);
-    }
-
-    // ---- Manual exact path (existing fallback) ----
-    if ((body as any).action === "manual" || ((body as any).email && (body as any).full_name)) {
-      const { email: guestEmail, full_name, event_id } = body as any;
-
-      const { data: lookup, error: le } = await admin.rpc("door_lookup_registration", {
-        p_email: guestEmail,
-        p_full_name: full_name,
-        p_event_id: event_id ?? null,
-      });
-
-      if (le) return json(500, { ok: false, error: le.message });
-      if (!(lookup as any)?.ok) return json(409, lookup as any);
-
-      const { data: checkin, error: ce } = await admin.rpc("door_checkin_atomic", {
-        p_registration_id: (lookup as any).registration_id,
-        p_method: "manual",
-      });
-
-      if (ce) return json(500, { ok: false, error: ce.message });
-
-      return (checkin as any)?.ok
-        ? json(200, {
-            ...(checkin as any),
-            flow: "manual_lookup_then_checkin",
-            name_match: (lookup as any).name_match,
-            name_on_file: (lookup as any).name_on_file,
-          })
-        : json(409, checkin as any);
-    }
-
-    return json(400, { ok: false, error: "Invalid request" });
-  } catch {
-    return json(500, { ok: false, error: "Unexpected server error" });
   }
-});
+
+  confirmBtn.addEventListener("click", doConfirm);
+
+  // ==== Clear / Next guest ====
+  function clearAll() {
+    // search + results
+    qInput.value = "";
+    lastQuery = "";
+    resultsEl.innerHTML = "";
+    lastCandidates = [];
+    resultsMeta.textContent = "No search yet.";
+    resultsCount.textContent = "";
+    hide(resultsScroll);
+    hide(searchStatus);
+    // selection
+    selected = null;
+    selTitle.textContent = "No guest selected";
+    selSub.textContent = "Select a guest from the list above.";
+    confirmBtn.disabled = true;
+    // inputs
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    banner("", "");
+    debugOut.textContent = "{}";
+  }
+
+  nextGuest.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
+  nextGuestTop.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
+
+  // ==== Init ====
+  signOutBtn.addEventListener("click", signOut);
+
+  (async () => {
+    const authed = await ensureAuth();
+    await resolveActiveEvent();
+
+    // Default: scanner mode (manual disabled)
+    setManual(false);
+    setVerifyMode("phone");
+  })();
+
+})();
+</script>
+
+</body>
+</html>
