@@ -111,6 +111,21 @@
 
     /* Long-press safety */
     button, .btn { -webkit-touch-callout:none; -webkit-user-select:none; user-select:none; }
+
+    /* Phone usability */
+    .mini{font-size:12px;color:var(--muted);}
+    .hide{display:none !important;}
+    .twoCol{display:grid;grid-template-columns:1fr;gap:12px;}
+    @media(min-width:760px){ .twoCol{grid-template-columns:1.2fr .8fr;} }
+    .mutedLink{color:var(--muted);text-decoration:underline;}
+
+    .sticky-actions{
+      position:sticky;
+      bottom:10px;
+      z-index:6;
+      padding-top:10px;
+      background:linear-gradient(180deg, rgba(11,16,32,0), rgba(11,16,32,.85) 35%, rgba(11,16,32,.95));
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -425,13 +440,17 @@
     for(const c of shown){
       const rid = c.registration_id || c.id || c.registrationId || "";
       const name = c.full_name || c.name || c.fullName || "(no name)";
+      // door_search_candidates returns masked_email + phone_present (no raw email/phone)
+      const masked = c.masked_email || c.maskedEmail || c.email_masked || "";
       const email = c.email || c.guest_email || "";
+      const phonePresent = (c.phone_present ?? c.phonePresent ?? null);
       const phone = c.phone_e164 || c.phone || "";
       const rem = (c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null);
       const lastCheckin = (c.last_checkin_at ?? c.lastCheckinAt ?? null);
       const metaBits = [];
-      if(email) metaBits.push(maskEmail(email));
-      if(phone) metaBits.push("📱");
+      if(masked) metaBits.push(masked);
+      else if(email) metaBits.push(maskEmail(email));
+      if(phonePresent === true || phone) metaBits.push("📱");
       if(rem !== null && rem !== undefined){
         if(Number(rem) <= 0){
           metaBits.push("ALREADY CHECKED IN");
@@ -459,7 +478,9 @@
   function selectCandidate(c){
     selectedCandidate = c;
     const name = c.full_name || c.name || "(no name)";
-    const email = c.email || c.guest_email || c.masked_email || "";
+    const email = c.email || c.guest_email || "";
+    const masked = c.masked_email || c.maskedEmail || "";
+    const phonePresent = (c.phone_present ?? c.phonePresent ?? false);
     const rid = c.registration_id || c.id || "";
     const rem = (c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null);
     const lastCheckin = (c.last_checkin_at ?? c.lastCheckinAt ?? null);
@@ -471,13 +492,29 @@
       statusLine = " • entries remaining: " + rem;
     }
 
-    selectedMeta.innerHTML = `Selected: <b>${esc(name)}</b> <span class="muted">(${esc(maskEmail(email))})</span><div class="muted" style="margin-top:6px;">${esc(rid)}${esc(statusLine)}</div>`;
+    const shownEmail = masked ? masked : maskEmail(email);
+    selectedMeta.innerHTML = `Selected: <b>${esc(name)}</b> <span class="muted">(${esc(shownEmail)})</span><div class="muted" style="margin-top:6px;">${esc(rid)}${esc(statusLine)}</div>`;
+
+    // Reduce scroll/clutter: once selected, hide list and bring Verify card into view
+    candidatesWrap.style.display = "none";
+    setTimeout(() => {
+      try{ verifyCard.scrollIntoView({ behavior: "smooth", block: "start" }); }catch(_e){}
+    }, 50);
     verifyCard.style.display = "";
-    verifyPhoneBlock.style.display = "";
-    verifyEmailBlock.style.display = "none";
+    // Default verifier based on whether phone exists for this registration
+    if(phonePresent){
+      verifyPhoneBlock.style.display = "";
+      verifyEmailBlock.style.display = "none";
+    } else {
+      verifyPhoneBlock.style.display = "none";
+      verifyEmailBlock.style.display = "";
+    }
     phoneLast4.value = "";
     emailPrefix.value = "";
     hide(verifyMsg);
+
+    // Keep the workflow tight on mobile
+    try{ verifyCard.scrollIntoView({behavior:"smooth", block:"start"}); }catch(_e){}
 
     if(rem !== null && rem !== undefined && Number(rem) <= 0){
       confirmBtn.disabled = true;
@@ -490,6 +527,9 @@
   }
 
   // ==== Search (event-scoped only) ====
+  let lastQuery = "";
+  let searchTimer = null;
+
   async function doSearch(){
     hide(verifyCard);
     hide(verifyMsg);
@@ -517,11 +557,16 @@
     }
 
     const q = (qInput.value || "").trim();
-    if(q.length < 3){
-      banner(searchStatus, "warn", "Type at least 3 characters.");
+    if(q.length < 1){
+      banner(searchStatus, "warn", "Type at least 1 character.");
+      hide(candidatesWrap);
+      lastCandidates = [];
       return;
     }
+    if(q === lastQuery) return;
+    lastQuery = q;
 
+    candidatesWrap.style.display = "";
     banner(searchStatus, "warn", "Searching…");
 
     // IMPORTANT: call the scoped overload ONLY
@@ -692,6 +737,13 @@ renderCandidates(normalized);
   // Enter key triggers search
   qInput.addEventListener("keydown", (e) => {
     if(e.key === "Enter"){ e.preventDefault(); doSearch(); }
+  });
+
+  // Live search (debounced) so the list updates as you type
+  qInput.addEventListener("input", () => {
+    if(!manualEnabled) return;
+    if(searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => { doSearch().catch(()=>{}); }, 250);
   });
 
   // Initial UI
