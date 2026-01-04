@@ -195,7 +195,20 @@
       display:block; height:100%; width:0%;
       background: rgba(56,189,248,.65);
     }
-  </style>
+  
+  /* Prevent sticky bottom sheet from covering candidate list */
+  #candidatesWrap { padding-bottom: 220px; }
+  @media (max-width: 520px){
+    #candidatesWrap { padding-bottom: 260px; }
+  }
+  /* Keep sheet from being overly tall */
+  #verifySheet { max-height: 40vh; }
+
+
+  #verifySheet.min { max-height: 56px !important; overflow: hidden; }
+  #verifySheet.min .sheetBody { display: none; }
+
+</style>
 </head>
 <body>
   <div class="wrap">
@@ -251,7 +264,7 @@
     </div>
   </div>
 
-  <div class="sheet" id="sheet">
+  <div class="sheet" id="sheet" id="verifySheet">
     <div class="sheetInner">
       <div class="sheetTop">
         <div class="selectedLine">
@@ -341,6 +354,19 @@
   const phoneLast4 = $("phoneLast4");
   const emailPrefix = $("emailPrefix");
   const confirmBtn = $("confirmBtn");
+
+  const verifySheet = document.getElementById('verifySheet');
+
+  // Bottom sheet minimize toggle (helps on small screens/keyboard)
+  const sheetToggle = document.getElementById('sheetToggle');
+  let sheetMin = false;
+  if(sheetToggle && verifySheet){
+    sheetToggle.addEventListener('click', () => {
+      sheetMin = !sheetMin;
+      verifySheet.classList.toggle('min', sheetMin);
+      sheetToggle.textContent = sheetMin ? "Expand" : "Minimize";
+    });
+  }
   const nextGuest = $("nextGuest");
   const nextGuestTop = $("nextGuestTop");
 
