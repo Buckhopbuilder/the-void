@@ -151,7 +151,11 @@
       :root { --sheet-safe: 300px; }
     }
 
-    /* Bottom sheet verify */
+    
+    @media (max-width: 520px){
+      .topbar { position: static; top: auto; }
+    }
+/* Bottom sheet verify */
     .sheet {
       position: fixed;
       left: 0; right:0; bottom: 0;
@@ -315,6 +319,8 @@
           <button id="modePhone">Phone last4</button>
           <button id="modeEmail">Email prefix</button>
           <button id="sheetToggle" class="miniBtn" title="Minimize/expand panel">Minimize</button>
+        
+          <button id="nextGuestSheet" class="good miniBtn" title="Clear selection and focus search">Next guest</button>
         </div>
       </div>
 
@@ -402,6 +408,7 @@
 
   const nextGuest = $("nextGuest");
   const nextGuestTop = $("nextGuestTop");
+  const nextGuestSheet = $("nextGuestSheet");
 
   // ==== State ====
   let activeEventId = null;
@@ -821,6 +828,11 @@ function clearSelectionOnly() {
     debugOut.textContent = "{}";
     setSheetIdle(true);
   }
+
+  nextGuestSheet && nextGuestSheet.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
 
   nextGuest.addEventListener("click", () => {
     clearAll();
