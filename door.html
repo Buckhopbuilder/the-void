@@ -136,7 +136,14 @@
     .tag.good { border-color: var(--goodStroke); background: var(--good); color:#d9fff1; }
     .tag.bad  { border-color: var(--badStroke);  background: var(--bad);  color:#ffe0e0; }
     .cand .right { text-align:right; }
+    
     .cand button { padding: 10px 12px; border-radius: 12px; }
+
+    /* Already-checked-in candidates: visually "final" + view-only */
+    .cand.checked { opacity: .62; }
+    .cand.checked .name { font-weight: 700; }
+    .cand.checked .tag.warn { background: rgba(245,158,11,.14); }
+    button.viewOnly { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); }
 
     .scroll { max-height: 55vh; overflow:auto; padding-right:2px; }
     @media (max-height: 760px) {
@@ -712,6 +719,21 @@ function clearSelectionOnly() {
     return c.last_checkin_at ?? c.lastCheckinAt ?? null;
   }
 
+  function fmtTs(ts) {
+    if(!ts) return "";
+    return String(ts).replace('T',' ').replace('Z','');
+  }
+
+  function viewCheckedIn(c) {
+    const name = c.full_name || c.name || "(no name)";
+    const last = getLastCheckin(c);
+    const at = last ? (" at " + fmtTs(last)) : "";
+    showOverlay("warn", "Already checked in", name + " was already checked in" + at + ".", [
+      { text:"Close", cls:"primary", onClick: () => { hideOverlay(); } },
+      { text:"Next guest", cls:"good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } },
+    ]);
+  }
+
   function renderCandidates(arr) {
     lastCandidates = Array.isArray(arr) ? arr : [];
     resultsEl.innerHTML = "";
@@ -732,28 +754,41 @@ function clearSelectionOnly() {
       const rem = getEntriesRemaining(c);
       const last = getLastCheckin(c);
       const hasPhone = candidateHasPhone(c);
+      const isChecked = (rem !== null && rem <= 0);
 
       const row = document.createElement("div");
-      row.className = "cand";
+      row.className = "cand" + (isChecked ? " checked" : "");
 
       const left = document.createElement("div");
       left.className = "left";
-      left.innerHTML = `
-        <div class="name">${esc(name)}</div>
-        <div class="meta">
-          <span class="tag">${esc(maskEmail(email))}</span>
-          ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
-          ${(rem !== null && rem <= 0) ? '<span class="tag warn">ALREADY CHECKED IN</span>' : (rem !== null ? '<span class="tag">entries: ' + esc(rem) + '</span>' : '')}
-          ${(rem !== null && rem <= 0 && last) ? '<span class="tag">at ' + esc(String(last).replace('T',' ').replace('Z','')) + '</span>' : ''}
-        </div>
-      `;
+
+      if(isChecked) {
+        left.innerHTML = `
+          <div class="name">${esc(name)}</div>
+          <div class="meta">
+            <span class="tag warn">ALREADY CHECKED IN</span>
+            ${last ? '<span class="tag">at ' + esc(fmtTs(last)) + '</span>' : ''}
+            <span class="tag">${esc(maskEmail(email))}</span>
+            ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
+          </div>
+        `;
+      } else {
+        left.innerHTML = `
+          <div class="name">${esc(name)}</div>
+          <div class="meta">
+            <span class="tag">${esc(maskEmail(email))}</span>
+            ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
+            ${(rem !== null) ? '<span class="tag">entries: ' + esc(rem) + '</span>' : ''}
+          </div>
+        `;
+      }
 
       const right = document.createElement("div");
       right.className = "right";
       const btn = document.createElement("button");
-      btn.textContent = "Select";
-      btn.className = "primary";
-      btn.addEventListener("click", () => selectCandidate(c));
+      btn.textContent = isChecked ? "View only" : "Select";
+      btn.className = isChecked ? "viewOnly" : "primary";
+      btn.addEventListener("click", () => isChecked ? viewCheckedIn(c) : selectCandidate(c));
       right.appendChild(btn);
 
       row.appendChild(left);
@@ -792,7 +827,7 @@ function clearSelectionOnly() {
 
     if(hasPhone) {
       setVerifyMode("phone");
-    setVerifyPanelCollapsed(true);
+      setVerifyPanelCollapsed(false);
     } else {
       setVerifyMode("email");
       banner("warn", "No phone on file for this guest. Use email prefix.");
