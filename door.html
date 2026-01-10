@@ -320,22 +320,21 @@
     .resultOverlay.warn .box { border-color: rgba(245,158,11,.55); }
     .resultOverlay.bad  .box { border-color: rgba(239,68,68,.55); }
 
-  
-    /* Mode visibility + bottom sheet behavior */
-    body.scanMode #manualBlock { display: none; }
-    body.scanMode #verifySheet { display: none; }
-    body.scanMode #candidatesWrap { padding-bottom: 0; }
-    body.scanMode #manualSection { display: none !important; }
-    body.manualMode #scanSection { display: none !important; }
-    body.scanMode #toggleDebug { display: none; }
 
-</style>
+    /* Scanner mode layout toggles */
+    body.mode-scan #manualBlock { display:none; }
+    body.mode-scan #verifySheet { display:none; }
+    body.mode-scan #toggleDebug { display:none; }
+
+    body.mode-manual #scannerBlock { display:none; }
+
+  </style>
 </head>
-<body class="scanMode">
+<body>
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="opacity:.6;font-weight:600;font-size:12px">build v9</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v10</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -351,7 +350,35 @@
 
     <div class="grid">
       <div class="card" id="scanCard">
-        <div id="manualBlock">
+        
+        <div id="scannerBlock">
+          <div class="resultsHeader">
+            <div>
+              <div style="font-weight:800;">Scanner (shell)</div>
+              <div class="muted">Camera scanning isn’t enabled yet. Paste a scanned payload to route into manual search.</div>
+            </div>
+            <div class="row" style="justify-content:flex-end; gap:8px;">
+              <button id="goManualBtn" class="primary">Manual lookup</button>
+            </div>
+          </div>
+
+          <div class="sep"></div>
+
+          <label for="scanPayload">Scan payload</label>
+          <input id="scanPayload" type="text" placeholder="Paste QR payload here…" autocomplete="off" inputmode="text" />
+
+          <div class="row" style="margin-top:10px;">
+            <button id="processScanBtn" class="primary">Process scan</button>
+            <button id="clearScanBtn">Clear</button>
+          </div>
+
+          <div class="tiny" style="margin-top:10px; opacity:.8;">
+            This shell routes you into the existing manual verification flow while we lock scan semantics.
+          </div>
+
+          <div class="sep"></div>
+        </div>
+<div id="manualBlock">
 <div class="resultsHeader">
           <div>
             <div style="font-weight:800;">Manual fallback (search)</div>
@@ -365,29 +392,7 @@
 
         <div class="sep"></div>
 
-        
-        </div>
-
-<div id="scanSection">
-          <div style="font-weight:800;">Scanner (shell)</div>
-          <div class="muted">Camera scanning is not enabled yet. Paste the scanned payload below to simulate a scan.</div>
-          <div class="sep"></div>
-
-          <label for="scanToken">Scan payload</label>
-          <input id="scanToken" type="text" placeholder="Paste QR payload here…" autocomplete="off" inputmode="text" />
-
-          <div class="row" style="margin-top:10px; gap:8px;">
-            <button id="scanBtn" class="primary">Process scan</button>
-            <button id="toManualBtn">Manual lookup</button>
-          </div>
-
-          <div class="tiny" style="margin-top:8px;">
-            This shell routes you into the existing manual verification flow while we lock scan semantics.
-          </div>
-        </div>
-
-        <div id="manualSection" style="display:none;">
-<label for="q">Search guest</label>
+        <label for="q">Search guest</label>
         <input id="q" type="text" placeholder="Start typing name / email / digits…" autocomplete="off" inputmode="text" disabled />
 
         <div class="muted" id="searchStatus" style="margin-top:8px; display:none;"></div>
@@ -407,8 +412,7 @@
           <summary>Result JSON (for debugging)</summary>
           <pre id="debugOut">{}</pre>
         </details>
-        </div>
-
+</div>
       </div>
     </div>
   </div>
@@ -464,8 +468,8 @@
 
 
 <script>
+
 (() => {
-  console.log('door.html build v9 loaded');
   // ==== Config ====
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_ma90uwKLz7Igb_xn9nXVwQ_W6k2KfiH";
@@ -563,11 +567,6 @@
   const signOutBtn = $("signOutBtn");
 
   const qInput = $("q");
-  const scanToken = $("scanToken");
-  const scanBtn = $("scanBtn");
-  const toManualBtn = $("toManualBtn");
-  const scanSection = $("scanSection");
-  const manualSection = $("manualSection");
   const searchStatus = $("searchStatus");
   const resultsEl = $("results");
   const resultsScroll = $("resultsScroll");
@@ -576,6 +575,13 @@
   const debugDetails = $("debugDetails");
   const debugOut = $("debugOut");
   const toggleDebug = $("toggleDebug");
+
+  // Scanner shell elements
+  const scanPayload = $("scanPayload");
+  const processScanBtn = $("processScanBtn");
+  const clearScanBtn = $("clearScanBtn");
+  const goManualBtn = $("goManualBtn");
+
 
   const selTitle = $("selTitle");
   const selSub = $("selSub");
@@ -598,6 +604,25 @@
   // ==== State ====
   let activeEventId = null;
   let isManual = false;
+  let mode = "scan"; // "scan" | "manual"
+
+  function applyMode() {
+    document.body.classList.toggle("mode-scan", mode === "scan");
+    document.body.classList.toggle("mode-manual", mode === "manual");
+    modePill.textContent = "Mode: " + (mode === "scan" ? "Scanner" : "Manual");
+    // manual input enabled only in manual mode
+    qInput.disabled = (mode !== "manual");
+    if(mode === "manual") {
+      // keep existing manual behavior: focus search
+      setTimeout(() => { try{ qInput.focus(); }catch(_e){} }, 50);
+    }
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    applyMode();
+  }
+
   let debugOn = false;
   let lastCandidates = [];
   let selected = null;
@@ -669,20 +694,10 @@ function clearSelectionOnly() {
   let holdStart = 0;
 
   function setManual(on) {
-    isManual = on;
-    // Mode classes for CSS behavior (hide verify sheet in scan mode)
-    document.body.classList.toggle('manualMode', !!on);
-    document.body.classList.toggle('scanMode', !on);
-    modePill.textContent = "Mode: " + (isManual ? "Manual" : "Scanner");
-    qInput.disabled = !isManual;
-
-    if(scanSection) scanSection.style.display = isManual ? "none" : "";
-    if(manualSection) manualSection.style.display = isManual ? "" : "none";
-
+    isManual = !!on;
+    setMode(isManual ? "manual" : "scan");
     if(!isManual) {
       clearAll();
-    } else {
-      qInput.focus();
     }
   }
 
@@ -719,6 +734,58 @@ function clearSelectionOnly() {
     debugOn = !debugOn;
     debugDetails.style.display = debugOn ? "" : "none";
   });
+
+  // ==== Scanner shell handlers ====
+  function normalizeScanInput(raw) {
+    const s = String(raw||"").trim();
+    if(!s) return "";
+    // If it's a URL, try to extract something useful.
+    try {
+      if(s.startsWith("http://") || s.startsWith("https://")) {
+        const u = new URL(s);
+        // common patterns: ?q= / ?code= / ?rid=
+        const qp = u.searchParams.get("q") || u.searchParams.get("code") || u.searchParams.get("rid") || "";
+        return (qp || u.pathname.split("/").filter(Boolean).pop() || "").trim();
+      }
+    } catch(_e) {}
+    return s;
+  }
+
+  function routeScanToManual(searchTerm) {
+    setManual(true); // switches to manual mode
+    qInput.value = searchTerm;
+    // trigger search immediately
+    doSearchNow();
+    showOverlay("warn", "Scan received", "Routed to manual search (shell). Select the correct guest and verify.", [
+      { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+    ]);
+  }
+
+  if(processScanBtn) {
+    processScanBtn.addEventListener("click", () => {
+      const term = normalizeScanInput(scanPayload?.value || "");
+      if(!term) {
+        showOverlay("warn", "No scan payload", "Paste a QR payload first.", [
+          { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+        ]);
+        return;
+      }
+      routeScanToManual(term);
+    });
+  }
+
+  if(clearScanBtn) {
+    clearScanBtn.addEventListener("click", () => {
+      if(scanPayload) scanPayload.value = "";
+      try { scanPayload.focus(); } catch(_e) {}
+    });
+  }
+
+  if(goManualBtn) {
+    goManualBtn.addEventListener("click", () => {
+      setManual(true);
+    });
+  }
 
   // ==== Sheet minimize toggle (now functional) ====
   let sheetMin = false;
@@ -913,7 +980,7 @@ function clearSelectionOnly() {
 
   async function doSearchNow() {
     const q = qInput.value.trim();
-    if(!isManual) return [];
+    if(!isManual) return;
 
     if(q.length < 2) {
       resultsMeta.textContent = "Type 2+ chars.";
@@ -921,7 +988,7 @@ function clearSelectionOnly() {
       resultsEl.innerHTML = "";
       hide(resultsScroll);
       hide(searchStatus);
-      return [];
+      return;
     }
 
     show(searchStatus);
@@ -945,44 +1012,12 @@ function clearSelectionOnly() {
 
     debugOut.textContent = JSON.stringify({ ok:true, used: res.used, count: arr.length, raw: raw }, null, 2);
     renderCandidates(arr);
-    return arr;
   }
 
   qInput.addEventListener("input", () => {
     if(searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(doSearchNow, DEBOUNCE_MS);
-
-  // ==== Scan shell (paste-to-scan) ====
-  async function processScanToken() {
-    const token = (scanToken?.value || "").trim();
-    if(!token) {
-      showOverlay("warn", "No scan payload", "Paste a QR payload, then tap Process scan.", [
-        { text:"Close", cls:"primary", onClick: () => { hideOverlay(); } },
-      ]);
-      return;
-    }
-
-    // For now: route into the existing manual lookup flow (no backend scan endpoint yet).
-    setManual(true);
-    qInput.value = token;
-
-    const arr = await doSearchNow();
-
-    // If we got exactly one match, auto-select it to reduce taps.
-    if(Array.isArray(arr) && arr.length === 1) {
-      selectCandidate(arr[0]);
-    }
-
-    showOverlay(
-      "good",
-      "Scan received",
-      "Switched to Manual lookup. Verify the selected guest to complete check-in.",
-      [{ text:"Continue", cls:"primary", onClick: () => { hideOverlay(); } }]
-    );
-  }
-
-  if(scanBtn) scanBtn.addEventListener("click", processScanToken);
-  if(toManualBtn) toManualBtn.addEventListener("click", () => { setManual(true); qInput.focus(); });
+  });
 
   // ==== Confirm check-in (via edge) ====
   async function doConfirm() {
@@ -1162,11 +1197,13 @@ function clearSelectionOnly() {
     await ensureAuth();
     await resolveActiveEvent();
     setManual(false);
+    applyMode();
     setVerifyMode("phone");
     setSheetIdle(true);
   })();
 
 })();
+
 </script>
 </body>
 </html>
