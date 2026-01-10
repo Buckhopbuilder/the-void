@@ -208,20 +208,6 @@
   #verifySheet.min { max-height: 56px !important; overflow: hidden; }
   #verifySheet.min .sheetBody { display: none; }
 
-
-  :root{ --sheetH: 220px; }
-
-  /* Candidate area becomes scrollable above the fixed sheet */
-  #candidatesWrap{
-    padding-bottom: 12px !important;
-    margin-bottom: var(--sheetH);
-  }
-  #candidates{
-    max-height: calc(100vh - var(--sheetH) - 180px);
-    overflow: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
 </style>
 </head>
 <body>
@@ -370,15 +356,6 @@
   const confirmBtn = $("confirmBtn");
 
   const verifySheet = document.getElementById('verifySheet');
-
-  function updateSheetH(){
-    if(!verifySheet) return;
-    const h = Math.max(120, Math.min(420, verifySheet.getBoundingClientRect().height));
-    document.documentElement.style.setProperty('--sheetH', h + 'px');
-  }
-  window.addEventListener('resize', updateSheetH);
-  setTimeout(updateSheetH, 50);
-  setTimeout(updateSheetH, 250);
 
   // Bottom sheet minimize toggle (helps on small screens/keyboard)
   const sheetToggle = document.getElementById('sheetToggle');
@@ -685,8 +662,13 @@
     if(!rid) { banner("bad", "Missing registration id."); return; }
 
     const usePhone = verifyMode === "phone";
-    const last4 = digitsOnly(phoneLast4.value).slice(-4);
-    const ep = emailPrefix.value.trim();
+    let last4 = digitsOnly(phoneLast4.value).slice(-4);
+    if(phoneLast4.value !== last4) phoneLast4.value = last4;
+    // normalize email prefix: lowercase, trim, and drop trailing punctuation (e.g. "aria." -> "aria")
+    let ep = (emailPrefix.value || "").trim().toLowerCase();
+    ep = ep.replace(/[^a-z0-9]+$/g, "");
+    // write back normalized value so staff can see what will be used
+    if(emailPrefix.value !== ep) emailPrefix.value = ep;
 
     if(usePhone) {
       if(last4.length < 3) { banner("warn", "Enter last 4 digits."); return; }
