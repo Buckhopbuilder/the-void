@@ -23,6 +23,10 @@
       --shadow: 0 10px 35px rgba(0,0,0,.35);
       --r:16px;
       --pad:14px;
+
+      /* Layout safety: space reserved for the bottom sheet */
+      --sheet-safe: 260px;
+
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
     }
     * { box-sizing:border-box; }
@@ -34,9 +38,12 @@
                   var(--bg);
       color:var(--text);
       -webkit-font-smoothing:antialiased;
-      padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 90px) 10px;
+
+      /* Bottom padding no longer hard-coded; candidatesWrap handles it */
+      padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px) 10px;
     }
     .wrap { max-width: 820px; margin:0 auto; }
+
     .topbar {
       display:flex; gap:10px; align-items:center; justify-content:space-between;
       padding: 10px 12px;
@@ -130,9 +137,18 @@
     .tag.bad  { border-color: var(--badStroke);  background: var(--bad);  color:#ffe0e0; }
     .cand .right { text-align:right; }
     .cand button { padding: 10px 12px; border-radius: 12px; }
+
     .scroll { max-height: 55vh; overflow:auto; padding-right:2px; }
     @media (max-height: 760px) {
       .scroll { max-height: 48vh; }
+    }
+
+    /* ====== Critical: prevent sheet from covering candidates ====== */
+    #candidatesWrap {
+      padding-bottom: var(--sheet-safe);
+    }
+    @media (max-width: 520px){
+      :root { --sheet-safe: 300px; }
     }
 
     /* Bottom sheet verify */
@@ -150,16 +166,24 @@
       box-shadow: 0 14px 60px rgba(0,0,0,.55);
       backdrop-filter: blur(12px);
       padding: 12px;
+
+      /* Keep sheet from becoming a wall */
+      max-height: 40vh;
+      overflow: auto;
     }
+
     .sheetTop { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
     .selectedLine { min-width:0; }
     .selectedLine .title { font-weight:800; font-size: 14px; }
     .selectedLine .sub { margin-top:4px; color: var(--muted); font-size: 12px; }
+
     .modePills { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
     .modePills button { padding: 9px 10px; font-size:12px; }
     .modePills .on { background: rgba(56,189,248,.22); border-color: rgba(56,189,248,.45); }
+
     .sheetControls { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
     .sheetControls .full { grid-column: 1 / -1; }
+
     .banner {
       margin-top: 10px;
       padding: 10px 12px;
@@ -172,6 +196,7 @@
     .banner.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
     .banner.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
     .banner.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
+
     details summary { cursor:pointer; color: var(--muted); font-size: 12px; }
     pre {
       white-space: pre-wrap;
@@ -195,23 +220,26 @@
       display:block; height:100%; width:0%;
       background: rgba(56,189,248,.65);
     }
-  
-  /* Prevent sticky bottom sheet from covering candidate list */
-  #candidatesWrap { padding-bottom: 220px; }
-  @media (max-width: 520px){
-    #candidatesWrap { padding-bottom: 260px; }
-  }
-  /* Keep sheet from being overly tall */
-  #verifySheet { max-height: 40vh; }
 
+    /* Minimized sheet state (works now because elements exist) */
+    #verifySheet.min .sheetInner {
+      max-height: none;
+      overflow: hidden;
+    }
+    #verifySheet.min .sheetBody {
+      display:none;
+    }
 
-  #verifySheet.min { max-height: 56px !important; overflow: hidden; }
-  #verifySheet.min .sheetBody { display: none; }
-
-</style>
+    /* Small utility button style for minimize */
+    .miniBtn {
+      padding: 9px 10px;
+      font-size: 12px;
+      border-radius: 12px;
+    }
+  </style>
 </head>
 <body>
-  <div class="wrap">
+  <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
         <div class="brand">VoidPass — Door</div>
@@ -220,7 +248,10 @@
       <div class="pills">
         <div class="pill" id="authPill">Auth: …</div>
         <div class="pill" id="modePill">Mode: Scanner</div>
-        <button id="manualHold" class="holdBtn" title="Hold to enable manual lookup">Hold: Manual<div class="bar"><i id="holdBar"></i></div></button>
+        <button id="manualHold" class="holdBtn" title="Hold to enable manual lookup">
+          Hold: Manual
+          <div class="bar"><i id="holdBar"></i></div>
+        </button>
         <button id="signOutBtn">Sign out</button>
       </div>
     </div>
@@ -264,7 +295,8 @@
     </div>
   </div>
 
-  <div class="sheet" id="sheet" id="verifySheet">
+  <!-- Bottom sheet -->
+  <div class="sheet" id="verifySheet">
     <div class="sheetInner">
       <div class="sheetTop">
         <div class="selectedLine">
@@ -274,23 +306,26 @@
         <div class="modePills">
           <button id="modePhone">Phone last4</button>
           <button id="modeEmail">Email prefix</button>
+          <button id="sheetToggle" class="miniBtn" title="Minimize/expand panel">Minimize</button>
         </div>
       </div>
 
-      <div class="sheetControls">
-        <div id="phoneBlock">
-          <label for="phoneLast4">Phone last 4 digits</label>
-          <input id="phoneLast4" type="text" placeholder="e.g. 4937" inputmode="numeric" />
+      <div class="sheetBody">
+        <div class="sheetControls">
+          <div id="phoneBlock">
+            <label for="phoneLast4">Phone last 4 digits</label>
+            <input id="phoneLast4" type="text" placeholder="e.g. 4937" inputmode="numeric" />
+          </div>
+          <div id="emailBlock">
+            <label for="emailPrefix">Email prefix</label>
+            <input id="emailPrefix" type="text" placeholder="e.g. jamie" inputmode="text" />
+          </div>
+          <button id="confirmBtn" class="primary full" disabled>Confirm check-in</button>
+          <button id="nextGuest" class="good">Next guest</button>
         </div>
-        <div id="emailBlock">
-          <label for="emailPrefix">Email prefix</label>
-          <input id="emailPrefix" type="text" placeholder="e.g. jamie" inputmode="text" />
-        </div>
-        <button id="confirmBtn" class="primary full" disabled>Confirm check-in</button>
-        <button id="nextGuest" class="good">Next guest</button>
-      </div>
 
-      <div id="banner" class="banner" style="display:none;"></div>
+        <div id="banner" class="banner" style="display:none;"></div>
+      </div>
     </div>
   </div>
 
@@ -306,7 +341,6 @@
   // ==== Helpers ====
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
   const maskEmail = (email) => {
     const e = String(email||"");
     const at = e.indexOf("@");
@@ -355,18 +389,9 @@
   const emailPrefix = $("emailPrefix");
   const confirmBtn = $("confirmBtn");
 
-  const verifySheet = document.getElementById('verifySheet');
+  const verifySheet = $("verifySheet");
+  const sheetToggle = $("sheetToggle");
 
-  // Bottom sheet minimize toggle (helps on small screens/keyboard)
-  const sheetToggle = document.getElementById('sheetToggle');
-  let sheetMin = false;
-  if(sheetToggle && verifySheet){
-    sheetToggle.addEventListener('click', () => {
-      sheetMin = !sheetMin;
-      verifySheet.classList.toggle('min', sheetMin);
-      sheetToggle.textContent = sheetMin ? "Expand" : "Minimize";
-    });
-  }
   const nextGuest = $("nextGuest");
   const nextGuestTop = $("nextGuestTop");
 
@@ -389,7 +414,6 @@
     }
     setPill(authPill, "bad", "Not signed in");
     authPill.title = "";
-    // If you have a separate login page, redirect here.
     return false;
   }
 
@@ -400,7 +424,6 @@
 
   // ==== Active event ====
   async function resolveActiveEvent() {
-    // Uses RPC if available (no assumptions about schema)
     try {
       const { data, error } = await sb.rpc("door_get_active_event_id");
       if(error) throw error;
@@ -422,7 +445,6 @@
     modePill.textContent = "Mode: " + (isManual ? "Manual" : "Scanner");
     qInput.disabled = !isManual;
     if(!isManual) {
-      // When leaving manual, clear search & selection to avoid stale info
       clearAll();
     } else {
       qInput.focus();
@@ -440,9 +462,7 @@
         clearInterval(holdTimer);
         holdTimer = null;
         holdBar.style.width = "100%";
-        // toggle manual
         setManual(!isManual);
-        // reset bar after a short moment
         setTimeout(() => { holdBar.style.width = "0%"; }, 150);
       }
     }, 16);
@@ -465,6 +485,16 @@
     debugDetails.style.display = debugOn ? "" : "none";
   });
 
+  // ==== Sheet minimize toggle (now functional) ====
+  let sheetMin = false;
+  if(sheetToggle && verifySheet){
+    sheetToggle.addEventListener("click", () => {
+      sheetMin = !sheetMin;
+      verifySheet.classList.toggle("min", sheetMin);
+      sheetToggle.textContent = sheetMin ? "Expand" : "Minimize";
+    });
+  }
+
   // ==== Verify mode toggle ====
   function setVerifyMode(mode) {
     verifyMode = mode;
@@ -472,7 +502,6 @@
     modeEmail.classList.toggle("on", verifyMode==="email");
     phoneBlock.style.display = verifyMode==="phone" ? "" : "none";
     emailBlock.style.display = verifyMode==="email" ? "" : "none";
-    // clear inputs when switching to reduce accidental mixed data
     phoneLast4.value = "";
     emailPrefix.value = "";
     banner("", "");
@@ -556,7 +585,6 @@
     if(rem !== null && rem <= 0) sub += " • ALREADY CHECKED IN" + (last ? (" • " + String(last).replace('T',' ').replace('Z','')) : "");
     selSub.textContent = sub;
 
-    // If already checked in, disable confirm to prevent mistakes
     if(rem !== null && rem <= 0) {
       confirmBtn.disabled = true;
       banner("warn", "Already checked in. Do not re-check-in.");
@@ -565,7 +593,6 @@
       banner("", "");
     }
 
-    // Pick best verifier by default
     if(hasPhone) {
       setVerifyMode("phone");
     } else {
@@ -573,8 +600,6 @@
       banner("warn", "No phone on file for this guest. Use email prefix.");
     }
 
-    // Collapse the list a bit on mobile after selection (reduce overload)
-    // (List remains available—just scroll position improves)
     setTimeout(() => {
       window.scrollTo({ top: 0, behavior: "smooth" });
     }, 60);
@@ -582,11 +607,9 @@
 
   // ==== Live search (debounced) ====
   let searchTimer = null;
-  let lastQuery = "";
   const DEBOUNCE_MS = 220;
 
   async function rpcSearchCandidates(eventId, q) {
-    // Try common variants. We do not assume exact arg names.
     const attempts = [
       { fn:"door_search_candidates", args: { p_event_id: eventId, p_query: q } },
       { fn:"door_search_candidates", args: { event_id: eventId, query: q } },
@@ -610,7 +633,6 @@
 
   async function doSearchNow() {
     const q = qInput.value.trim();
-    lastQuery = q;
     if(!isManual) return;
 
     if(q.length < 2) {
@@ -635,12 +657,10 @@
       return;
     }
 
-    // Normalize: may return array or object {ok,candidates:[...]} depending on RPC wrapper
     const raw = res.data;
     const normalized = (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.candidates)) ? raw.candidates : raw;
     const arr = Array.isArray(normalized) ? normalized : [];
 
-    searchStatus.textContent = "Done.";
     hide(searchStatus);
 
     debugOut.textContent = JSON.stringify({ ok:true, used: res.used, count: arr.length, raw: raw }, null, 2);
@@ -664,10 +684,9 @@
     const usePhone = verifyMode === "phone";
     let last4 = digitsOnly(phoneLast4.value).slice(-4);
     if(phoneLast4.value !== last4) phoneLast4.value = last4;
-    // normalize email prefix: lowercase, trim, and drop trailing punctuation (e.g. "aria." -> "aria")
+
     let ep = (emailPrefix.value || "").trim().toLowerCase();
     ep = ep.replace(/[^a-z0-9]+$/g, "");
-    // write back normalized value so staff can see what will be used
     if(emailPrefix.value !== ep) emailPrefix.value = ep;
 
     if(usePhone) {
@@ -703,12 +722,9 @@
       });
       json = await resp.json().catch(() => ({ ok:false, code:"bad_json" }));
 
-      // Surface outcomes clearly but not humiliatingly
       if(resp.ok && json.ok) {
         banner("good", "Checked in. Next guest.");
-        // Haptic / vibration if available (subtle)
         try { if(navigator.vibrate) navigator.vibrate(30); } catch(_e) {}
-        // Refresh the selected card state so "already checked in" appears on immediate re-search
         await doSearchNow();
       } else {
         if(json?.code === "already_checked_in") {
@@ -732,7 +748,6 @@
       banner("bad", "Network error.");
       debugOut.textContent = JSON.stringify({ ok:false, error: String(e?.message || e) }, null, 2);
     } finally {
-      // Re-enable unless already checked-in (still allow next guest)
       confirmBtn.disabled = false;
     }
   }
@@ -741,21 +756,19 @@
 
   // ==== Clear / Next guest ====
   function clearAll() {
-    // search + results
     qInput.value = "";
-    lastQuery = "";
     resultsEl.innerHTML = "";
     lastCandidates = [];
     resultsMeta.textContent = "No search yet.";
     resultsCount.textContent = "";
     hide(resultsScroll);
     hide(searchStatus);
-    // selection
+
     selected = null;
     selTitle.textContent = "No guest selected";
     selSub.textContent = "Select a guest from the list above.";
     confirmBtn.disabled = true;
-    // inputs
+
     phoneLast4.value = "";
     emailPrefix.value = "";
     banner("", "");
@@ -775,16 +788,13 @@
   signOutBtn.addEventListener("click", signOut);
 
   (async () => {
-    const authed = await ensureAuth();
+    await ensureAuth();
     await resolveActiveEvent();
-
-    // Default: scanner mode (manual disabled)
     setManual(false);
     setVerifyMode("phone");
   })();
 
 })();
 </script>
-
 </body>
 </html>
