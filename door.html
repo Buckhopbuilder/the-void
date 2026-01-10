@@ -322,6 +322,7 @@
 
   
     /* Mode visibility + bottom sheet behavior */
+    body.scanMode #manualBlock { display: none; }
     body.scanMode #verifySheet { display: none; }
     body.scanMode #candidatesWrap { padding-bottom: 0; }
     body.scanMode #manualSection { display: none !important; }
@@ -330,11 +331,11 @@
 
 </style>
 </head>
-<body>
+<body class="scanMode">
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="opacity:.6;font-weight:600;font-size:12px">build v8</span></div>
+        <div class="brand">VoidPass — Door <span style="opacity:.6;font-weight:600;font-size:12px">build v9</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -350,7 +351,8 @@
 
     <div class="grid">
       <div class="card" id="scanCard">
-        <div class="resultsHeader">
+        <div id="manualBlock">
+<div class="resultsHeader">
           <div>
             <div style="font-weight:800;">Manual fallback (search)</div>
             <div class="muted">Hold “Manual” to enable. Type 2+ chars. List updates as you type.</div>
@@ -364,7 +366,9 @@
         <div class="sep"></div>
 
         
-        <div id="scanSection">
+        </div>
+
+<div id="scanSection">
           <div style="font-weight:800;">Scanner (shell)</div>
           <div class="muted">Camera scanning is not enabled yet. Paste the scanned payload below to simulate a scan.</div>
           <div class="sep"></div>
@@ -461,7 +465,7 @@
 
 <script>
 (() => {
-  console.log('door.html build v8 loaded');
+  console.log('door.html build v9 loaded');
   // ==== Config ====
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_ma90uwKLz7Igb_xn9nXVwQ_W6k2KfiH";
