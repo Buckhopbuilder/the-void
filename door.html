@@ -324,17 +324,24 @@
     /* Scanner mode layout toggles */
     body.mode-scan #manualBlock { display:none; }
     body.mode-scan #verifySheet { display:none; }
-    body.mode-scan #toggleDebug { display:none; }
 
     body.mode-manual #scannerBlock { display:none; }
 
-  </style>
+  
+    /* v11.2: prevent accidental switch to manual while scanning */
+    body.mode-scan #manualHoldBtn,
+    body.mode-scan #holdBarWrap {
+      display: none !important;
+    }
+    body.mode-scan #debugBtn { display: none !important; }
+
+</style>
 </head>
 <body class="mode-scan">
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v11.1</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v11.3</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -703,6 +710,7 @@ function clearSelectionOnly() {
 
   manualHoldBtn.addEventListener("pointerdown", (ev) => {
     ev.preventDefault();
+    if(mode === "scan") { return; }
     holdStart = Date.now();
     holdBar.style.width = "0%";
     holdTimer = setInterval(() => {
@@ -1359,6 +1367,7 @@ function clearSelectionOnly() {
     await ensureAuth();
     await resolveActiveEvent();
     setManual(false);
+    setMode("scan");
     applyMode();
     setVerifyMode("phone");
     setSheetIdle(true);
