@@ -683,7 +683,10 @@
     const token = sess?.session?.access_token || "";
 
     const payload = {
+      action: "confirm_candidate",
+      event_id: activeEventId,
       registration_id: rid,
+      method: usePhone ? "phone_last4" : "email_prefix",
       phone_last4: usePhone ? last4 : null,
       email_prefix: usePhone ? null : ep
     };
