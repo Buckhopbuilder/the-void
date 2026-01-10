@@ -221,6 +221,14 @@
       background: rgba(56,189,248,.65);
     }
 
+/* Idle sheet state: keep panel calm until a guest is selected */
+#verifySheet.idle .sheetBody { display:none; }
+#verifySheet.idle .modePills { display:none; }
+#verifySheet.idle .sheetInner {
+  max-height: none;
+  overflow: hidden;
+}
+
     /* Minimized sheet state (works now because elements exist) */
     #verifySheet.min .sheetInner {
       max-height: none;
@@ -403,6 +411,34 @@
   let selected = null;
   let verifyMode = "phone"; // phone | email
 
+
+// ==== Sheet state helpers (UX polish) ====
+// Rule A: keep verify panel collapsed until a candidate is selected,
+// and auto-collapse again after successful check-in.
+function setSheetIdle(on) {
+  if(!verifySheet) return;
+  verifySheet.classList.toggle("idle", !!on);
+
+  // Auto-expand behavior: idle always cancels "min"
+  if(on) {
+    sheetMin = false;
+    verifySheet.classList.remove("min");
+    if(sheetToggle) sheetToggle.textContent = "Minimize";
+  }
+}
+
+function clearSelectionOnly() {
+  selected = null;
+  selTitle.textContent = "No guest selected";
+  selSub.textContent = "Select a guest from the list above.";
+  confirmBtn.disabled = true;
+  phoneLast4.value = "";
+  emailPrefix.value = "";
+  banner("", "");
+  setSheetIdle(true);
+}
+
+
   // ==== Auth ====
   async function ensureAuth() {
     const { data } = await sb.auth.getSession();
@@ -573,6 +609,11 @@
 
   function selectCandidate(c) {
     selected = c;
+    // Auto-expand verify panel when a candidate is selected
+    setSheetIdle(false);
+    sheetMin = false;
+    verifySheet.classList.remove("min");
+    if(sheetToggle) sheetToggle.textContent = "Minimize";
     const name = c.full_name || c.name || "(no name)";
     const email = c.email || c.guest_email || c.masked_email || "";
     const id = c.registration_id || c.id || "";
@@ -726,6 +767,11 @@
         banner("good", "Checked in. Next guest.");
         try { if(navigator.vibrate) navigator.vibrate(30); } catch(_e) {}
         await doSearchNow();
+
+        // Auto-collapse verify panel for the next person (keep search/results)
+        setTimeout(() => {
+          clearSelectionOnly();
+        }, 500);
       } else {
         if(json?.code === "already_checked_in") {
           const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
@@ -773,6 +819,7 @@
     emailPrefix.value = "";
     banner("", "");
     debugOut.textContent = "{}";
+    setSheetIdle(true);
   }
 
   nextGuest.addEventListener("click", () => {
@@ -792,6 +839,7 @@
     await resolveActiveEvent();
     setManual(false);
     setVerifyMode("phone");
+    setSheetIdle(true);
   })();
 
 })();
