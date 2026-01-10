@@ -248,6 +248,31 @@
       font-size: 12px;
       border-radius: 12px;
     }
+
+    /* Toast (fixed feedback, independent of sheet state) */
+    .toast {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(env(safe-area-inset-bottom) + 88px);
+      z-index: 50;
+      max-width: min(820px, calc(100vw - 24px));
+      width: fit-content;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(11,16,32,.92);
+      color: var(--text);
+      box-shadow: 0 16px 70px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      font-size: 13px;
+      line-height: 1.25;
+      display: none;
+    }
+    .toast.good { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.45); }
+    .toast.warn { background: rgba(245,158,11,.18); border-color: rgba(245,158,11,.45); }
+    .toast.bad  { background: rgba(239,68,68,.20);  border-color: rgba(239,68,68,.50); }
+    .toast b { font-weight: 800; }
   </style>
 </head>
 <body>
@@ -343,6 +368,9 @@
     </div>
   </div>
 
+  <!-- Toast feedback (success/error) -->
+  <div id="toast" class="toast"></div>
+
 <script>
 (() => {
   // ==== Config ====
@@ -373,6 +401,27 @@
     b.className = "banner " + kind;
     b.textContent = msg;
     show(b);
+  };
+
+  // Toast (fixed, survives sheet collapse)
+  let toastTimer = null;
+  const showToast = (kind, msg, ms=1400) => {
+    const t = $("toast");
+    if(!t) return;
+    if(toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
+    t.className = "toast " + (kind || "");
+    t.innerHTML = msg;
+    t.style.display = "";
+    toastTimer = setTimeout(() => {
+      t.style.display = "none";
+      t.innerHTML = "";
+    }, ms);
+  };
+
+  const haptic = {
+    ok: () => { try { if(navigator.vibrate) navigator.vibrate([20]); } catch(_e) {} },
+    warn: () => { try { if(navigator.vibrate) navigator.vibrate([35,25,35]); } catch(_e) {} },
+    bad: () => { try { if(navigator.vibrate) navigator.vibrate([50,30,50]); } catch(_e) {} },
   };
 
   // ==== Elements ====
@@ -722,12 +771,27 @@ function clearSelectionOnly() {
 
   // ==== Confirm check-in (via edge) ====
   async function doConfirm() {
-    if(!selected) { banner("warn", "Select a guest first."); return; }
+    if(!selected) {
+      banner("warn", "Select a guest first.");
+      showToast("warn", "<b>Select a guest</b> from the list first.", 1600);
+      haptic.warn();
+      return;
+    }
     const rem = getEntriesRemaining(selected);
-    if(rem !== null && rem <= 0) { banner("warn", "Already checked in. Do not re-check-in."); return; }
+    if(rem !== null && rem <= 0) {
+      banner("warn", "Already checked in. Do not re-check-in.");
+      showToast("warn", "<b>Already checked in.</b>", 1800);
+      haptic.warn();
+      return;
+    }
 
     const rid = selected.registration_id || selected.id;
-    if(!rid) { banner("bad", "Missing registration id."); return; }
+    if(!rid) {
+      banner("bad", "Missing registration id.");
+      showToast("bad", "<b>Missing ID.</b>", 2000);
+      haptic.bad();
+      return;
+    }
 
     const usePhone = verifyMode === "phone";
     let last4 = digitsOnly(phoneLast4.value).slice(-4);
@@ -738,9 +802,19 @@ function clearSelectionOnly() {
     if(emailPrefix.value !== ep) emailPrefix.value = ep;
 
     if(usePhone) {
-      if(last4.length < 3) { banner("warn", "Enter last 4 digits."); return; }
+      if(last4.length < 3) {
+        banner("warn", "Enter last 4 digits.");
+        showToast("warn", "<b>Enter phone last 4</b> digits.", 1700);
+        haptic.warn();
+        return;
+      }
     } else {
-      if(ep.length < 2) { banner("warn", "Enter email prefix."); return; }
+      if(ep.length < 2) {
+        banner("warn", "Enter email prefix.");
+        showToast("warn", "<b>Enter email prefix</b> (at least 2 chars).", 1800);
+        haptic.warn();
+        return;
+      }
     }
 
     confirmBtn.disabled = true;
@@ -772,7 +846,8 @@ function clearSelectionOnly() {
 
       if(resp.ok && json.ok) {
         banner("good", "Checked in. Next guest.");
-        try { if(navigator.vibrate) navigator.vibrate(30); } catch(_e) {}
+        showToast("good", "<b>Checked in.</b> Next guest.", 1200);
+        haptic.ok();
         await doSearchNow();
 
         // Auto-collapse verify panel for the next person (keep search/results)
@@ -783,22 +858,37 @@ function clearSelectionOnly() {
         if(json?.code === "already_checked_in") {
           const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
           banner("warn", "Already checked in" + at + ".");
+          showToast("warn", "<b>Already checked in</b>" + esc(at) + ".", 1900);
+          haptic.warn();
         } else if(json?.code === "not_verified") {
-          banner("warn", "Not verified. Try again.");
+          banner("warn", "Not verified. Check last4/prefix and try again.");
+          showToast("warn", "<b>Not verified.</b> Check last4/prefix and try again.", 2000);
+          haptic.warn();
         } else if(json?.code === "email_prefix_required") {
           banner("warn", "Email prefix required for this guest.");
+          showToast("warn", "<b>Use email prefix.</b> This guest has no phone on file.", 2000);
+          haptic.warn();
         } else if(json?.code === "phone_last4_required") {
           banner("warn", "Phone last 4 required for this guest.");
+          showToast("warn", "<b>Use phone last 4.</b> Phone is on file for this guest.", 2000);
+          haptic.warn();
         } else if(json?.code === "no_active_event") {
           banner("bad", "No active event.");
+          showToast("bad", "<b>No active event.</b>", 2200);
+          haptic.bad();
         } else {
-          banner("warn", (json?.code ? (json.code + ".") : "Not verified. Try again."));
+          const msg = json?.code ? String(json.code) : "Not verified";
+          banner("warn", msg + ".");
+          showToast("warn", "<b>Not verified.</b> " + esc(msg) + ".", 2000);
+          haptic.warn();
         }
       }
 
       debugOut.textContent = JSON.stringify({ edge_response: json, payload_sent: payload }, null, 2);
     } catch (e) {
       banner("bad", "Network error.");
+      showToast("bad", "<b>Network error.</b> Try again.", 2200);
+      haptic.bad();
       debugOut.textContent = JSON.stringify({ ok:false, error: String(e?.message || e) }, null, 2);
     } finally {
       confirmBtn.disabled = false;
