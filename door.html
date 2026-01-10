@@ -273,6 +273,46 @@
     .toast.warn { background: rgba(245,158,11,.18); border-color: rgba(245,158,11,.45); }
     .toast.bad  { background: rgba(239,68,68,.20);  border-color: rgba(239,68,68,.50); }
     .toast b { font-weight: 800; }
+  
+    /* Result overlay (persistent, blocks list) */
+    .resultOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      padding: 16px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+    }
+    .resultOverlay .box {
+      max-width: 520px;
+      margin: 14vh auto 0 auto;
+      background: rgba(11,16,32,.94);
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 18px;
+      box-shadow: 0 18px 70px rgba(0,0,0,.60);
+      padding: 16px;
+    }
+    .resultOverlay .title {
+      font-weight: 900;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .resultOverlay .msg {
+      color: rgba(232,238,252,.85);
+      font-size: 14px;
+      line-height: 1.35;
+      margin-bottom: 14px;
+    }
+    .resultOverlay .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .resultOverlay.good .box { border-color: rgba(16,185,129,.55); }
+    .resultOverlay.warn .box { border-color: rgba(245,158,11,.55); }
+    .resultOverlay.bad  .box { border-color: rgba(239,68,68,.55); }
+
   </style>
 </head>
 <body>
@@ -371,6 +411,17 @@
   <!-- Toast feedback (success/error) -->
   <div id="toast" class="toast"></div>
 
+
+  <!-- Persistent result overlay (prevents list distraction) -->
+  <div class="resultOverlay" id="resultOverlay" role="dialog" aria-modal="true" aria-live="assertive">
+    <div class="box">
+      <div class="title" id="ovTitle">Result</div>
+      <div class="msg" id="ovMsg"></div>
+      <div class="actions" id="ovActions"></div>
+    </div>
+  </div>
+
+
 <script>
 (() => {
   // ==== Config ====
@@ -404,27 +455,64 @@
   };
 
   // Toast (fixed, survives sheet collapse)
-  let toastTimer = null;
-  const showToast = (kind, msg, ms=1400) => {
-    const t = $("toast");
-    if(!t) return;
-    if(toastTimer) { clearTimeout(toastTimer); toastTimer = null; }
-    t.className = "toast " + (kind || "");
-    t.innerHTML = msg;
-    t.style.display = "";
-    toastTimer = setTimeout(() => {
-      t.style.display = "none";
-      t.innerHTML = "";
-    }, ms);
+  // Result overlay (persistent; hides candidate list until dismissed)
+  let overlayVisible = false;
+  let resultsWereVisible = false;
+
+  const haptics = {
+    good: () => { try { if(navigator.vibrate) navigator.vibrate([20]); } catch(_e) {} },
+    warn: () => { try { if(navigator.vibrate) navigator.vibrate([20,30,20]); } catch(_e) {} },
+    bad:  () => { try { if(navigator.vibrate) navigator.vibrate([50,30,50]); } catch(_e) {} },
   };
 
-  const haptic = {
-    ok: () => { try { if(navigator.vibrate) navigator.vibrate([20]); } catch(_e) {} },
-    warn: () => { try { if(navigator.vibrate) navigator.vibrate([35,25,35]); } catch(_e) {} },
-    bad: () => { try { if(navigator.vibrate) navigator.vibrate([50,30,50]); } catch(_e) {} },
+  const hideResultsForOverlay = () => {
+    resultsWereVisible = (resultsScroll && resultsScroll.style.display !== "none");
+    if(resultsScroll) resultsScroll.style.display = "none";
+  };
+  const restoreResultsAfterOverlay = () => {
+    if(resultsWereVisible && lastCandidates && lastCandidates.length) {
+      if(resultsScroll) resultsScroll.style.display = "";
+    }
+    resultsWereVisible = false;
   };
 
-  // ==== Elements ====
+  const showOverlay = (kind, title, msg, actions=[]) => {
+    const ov = $("resultOverlay");
+    const ovTitle = $("ovTitle");
+    const ovMsg = $("ovMsg");
+    const ovActions = $("ovActions");
+    if(!ov || !ovTitle || !ovMsg || !ovActions) return;
+
+    hideResultsForOverlay();
+
+    ov.className = "resultOverlay " + (kind || "");
+    ovTitle.textContent = title || "Result";
+    ovMsg.textContent = msg || "";
+    ovActions.innerHTML = "";
+
+    for(const a of actions) {
+      const b = document.createElement("button");
+      b.textContent = a.text || "OK";
+      b.className = a.cls || "primary";
+      b.addEventListener("click", () => {
+        try { a.onClick && a.onClick(); } finally {}
+      });
+      ovActions.appendChild(b);
+    }
+
+    ov.style.display = "";
+    overlayVisible = true;
+    (haptics[kind] || (()=>{}))();
+  };
+
+  const hideOverlay = () => {
+    const ov = $("resultOverlay");
+    if(!ov) return;
+    ov.style.display = "none";
+    overlayVisible = false;
+    restoreResultsAfterOverlay();
+  };
+// ==== Elements ====
   const authPill = $("authPill");
   const modePill = $("modePill");
   const eventPill = $("eventPill");
@@ -454,6 +542,7 @@
 
   const verifySheet = $("verifySheet");
   const sheetToggle = $("sheetToggle");
+  const sheetBodyEl = document.querySelector(".sheetBody");
 
   const nextGuest = $("nextGuest");
   const nextGuestTop = $("nextGuestTop");
@@ -587,7 +676,17 @@ function clearSelectionOnly() {
     });
   }
 
-  // ==== Verify mode toggle ====
+  
+  // Unified collapse control: collapsed when no guest selected / after success
+  const setVerifyPanelCollapsed = (collapsed) => {
+    if(!verifySheet || !sheetBodyEl) return;
+    verifySheet.classList.toggle("min", !!collapsed);
+    sheetBodyEl.style.display = collapsed ? "none" : "";
+    sheetMin = !!collapsed;
+    if(sheetToggle) sheetToggle.textContent = collapsed ? "Expand" : "Minimize";
+  };
+
+// ==== Verify mode toggle ====
   function setVerifyMode(mode) {
     verifyMode = mode;
     modePhone.classList.toggle("on", verifyMode==="phone");
@@ -665,6 +764,7 @@ function clearSelectionOnly() {
 
   function selectCandidate(c) {
     selected = c;
+    setVerifyPanelCollapsed(false);
     // Auto-expand verify panel when a candidate is selected
     setSheetIdle(false);
     sheetMin = false;
@@ -692,6 +792,7 @@ function clearSelectionOnly() {
 
     if(hasPhone) {
       setVerifyMode("phone");
+    setVerifyPanelCollapsed(true);
     } else {
       setVerifyMode("email");
       banner("warn", "No phone on file for this guest. Use email prefix.");
@@ -772,24 +873,27 @@ function clearSelectionOnly() {
   // ==== Confirm check-in (via edge) ====
   async function doConfirm() {
     if(!selected) {
-      banner("warn", "Select a guest first.");
-      showToast("warn", "<b>Select a guest</b> from the list first.", 1600);
-      haptic.warn();
+      showOverlay("warn", "Select a guest", "Select a guest from the list above.", [
+        { text: "OK", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
       return;
     }
+
     const rem = getEntriesRemaining(selected);
     if(rem !== null && rem <= 0) {
-      banner("warn", "Already checked in. Do not re-check-in.");
-      showToast("warn", "<b>Already checked in.</b>", 1800);
-      haptic.warn();
+      const at = (getLastCheckin(selected) ? (" at " + String(getLastCheckin(selected)).replace('T',' ').replace('Z','')) : "");
+      showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
+        { text: "Next guest", cls: "good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } },
+        { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
       return;
     }
 
     const rid = selected.registration_id || selected.id;
     if(!rid) {
-      banner("bad", "Missing registration id.");
-      showToast("bad", "<b>Missing ID.</b>", 2000);
-      haptic.bad();
+      showOverlay("bad", "Missing ID", "This record is missing a registration id. Try searching again.", [
+        { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
       return;
     }
 
@@ -803,16 +907,16 @@ function clearSelectionOnly() {
 
     if(usePhone) {
       if(last4.length < 3) {
-        banner("warn", "Enter last 4 digits.");
-        showToast("warn", "<b>Enter phone last 4</b> digits.", 1700);
-        haptic.warn();
+        showOverlay("warn", "Need phone digits", "Enter the guest's phone last 4 digits.", [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); setTimeout(() => phoneLast4.focus(), 50); } },
+        ]);
         return;
       }
     } else {
       if(ep.length < 2) {
-        banner("warn", "Enter email prefix.");
-        showToast("warn", "<b>Enter email prefix</b> (at least 2 chars).", 1800);
-        haptic.warn();
+        showOverlay("warn", "Need email prefix", "Enter the first part of the guest's email (before @).", [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); setTimeout(() => emailPrefix.focus(), 50); } },
+        ]);
         return;
       }
     }
@@ -842,53 +946,56 @@ function clearSelectionOnly() {
         },
         body: JSON.stringify(payload)
       });
+
       json = await resp.json().catch(() => ({ ok:false, code:"bad_json" }));
 
       if(resp.ok && json.ok) {
-        banner("good", "Checked in. Next guest.");
-        showToast("good", "<b>Checked in.</b> Next guest.", 1200);
-        haptic.ok();
+        // Refresh list in background (if still open later)
         await doSearchNow();
 
-        // Auto-collapse verify panel for the next person (keep search/results)
-        setTimeout(() => {
-          clearSelectionOnly();
-        }, 500);
+        // Collapse verify panel to quiet state
+        setVerifyPanelCollapsed(true);
+
+        showOverlay("good", "Checked in", "Check-in recorded successfully.", [
+          { text: "Next guest", cls: "good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } }
+        ]);
       } else {
+        // Map known errors to clearer copy
         if(json?.code === "already_checked_in") {
           const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
-          banner("warn", "Already checked in" + at + ".");
-          showToast("warn", "<b>Already checked in</b>" + esc(at) + ".", 1900);
-          haptic.warn();
+          showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
+            { text: "Next guest", cls: "good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } },
+            { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+          ]);
         } else if(json?.code === "not_verified") {
-          banner("warn", "Not verified. Check last4/prefix and try again.");
-          showToast("warn", "<b>Not verified.</b> Check last4/prefix and try again.", 2000);
-          haptic.warn();
+          showOverlay("warn", "Not verified", "Details didn't match. Try again.", [
+            { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); setTimeout(() => (usePhone ? phoneLast4.focus() : emailPrefix.focus()), 50); } },
+          ]);
         } else if(json?.code === "email_prefix_required") {
-          banner("warn", "Email prefix required for this guest.");
-          showToast("warn", "<b>Use email prefix.</b> This guest has no phone on file.", 2000);
-          haptic.warn();
+          showOverlay("warn", "Email required", "This guest has no phone on file. Use email prefix.", [
+            { text: "Use email", cls: "primary", onClick: () => { hideOverlay(); setVerifyMode("email"); setTimeout(() => emailPrefix.focus(), 50); } },
+          ]);
         } else if(json?.code === "phone_last4_required") {
-          banner("warn", "Phone last 4 required for this guest.");
-          showToast("warn", "<b>Use phone last 4.</b> Phone is on file for this guest.", 2000);
-          haptic.warn();
+          showOverlay("warn", "Phone required", "This guest has a phone on file. Use phone last 4.", [
+            { text: "Use phone", cls: "primary", onClick: () => { hideOverlay(); setVerifyMode("phone"); setTimeout(() => phoneLast4.focus(), 50); } },
+          ]);
         } else if(json?.code === "no_active_event") {
-          banner("bad", "No active event.");
-          showToast("bad", "<b>No active event.</b>", 2200);
-          haptic.bad();
+          showOverlay("bad", "No active event", "There is no active event right now.", [
+            { text: "OK", cls: "primary", onClick: () => { hideOverlay(); } },
+          ]);
         } else {
-          const msg = json?.code ? String(json.code) : "Not verified";
-          banner("warn", msg + ".");
-          showToast("warn", "<b>Not verified.</b> " + esc(msg) + ".", 2000);
-          haptic.warn();
+          const code = json?.code ? String(json.code) : "unknown_error";
+          showOverlay("bad", "Check-in failed", "Could not check in (" + code + ").", [
+            { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+          ]);
         }
       }
 
       debugOut.textContent = JSON.stringify({ edge_response: json, payload_sent: payload }, null, 2);
     } catch (e) {
-      banner("bad", "Network error.");
-      showToast("bad", "<b>Network error.</b> Try again.", 2200);
-      haptic.bad();
+      showOverlay("bad", "Network error", "Couldn't reach the server. Try again.", [
+        { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
       debugOut.textContent = JSON.stringify({ ok:false, error: String(e?.message || e) }, null, 2);
     } finally {
       confirmBtn.disabled = false;
@@ -911,6 +1018,7 @@ function clearSelectionOnly() {
     selTitle.textContent = "No guest selected";
     selSub.textContent = "Select a guest from the list above.";
     confirmBtn.disabled = true;
+    setVerifyPanelCollapsed(true);
 
     phoneLast4.value = "";
     emailPrefix.value = "";
