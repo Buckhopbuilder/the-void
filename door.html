@@ -320,7 +320,15 @@
     .resultOverlay.warn .box { border-color: rgba(245,158,11,.55); }
     .resultOverlay.bad  .box { border-color: rgba(239,68,68,.55); }
 
-  </style>
+  
+    /* Mode visibility + bottom sheet behavior */
+    body.scanMode #verifySheet { display: none; }
+    body.scanMode #candidatesWrap { padding-bottom: 0; }
+    body.scanMode #manualSection { display: none !important; }
+    body.manualMode #scanSection { display: none !important; }
+    body.scanMode #toggleDebug { display: none; }
+
+</style>
 </head>
 <body>
   <div class="wrap" id="candidatesWrap">
@@ -657,6 +665,9 @@ function clearSelectionOnly() {
 
   function setManual(on) {
     isManual = on;
+    // Mode classes for CSS behavior (hide verify sheet in scan mode)
+    document.body.classList.toggle('manualMode', !!on);
+    document.body.classList.toggle('scanMode', !on);
     modePill.textContent = "Mode: " + (isManual ? "Manual" : "Scanner");
     qInput.disabled = !isManual;
 
@@ -967,7 +978,6 @@ function clearSelectionOnly() {
 
   if(scanBtn) scanBtn.addEventListener("click", processScanToken);
   if(toManualBtn) toManualBtn.addEventListener("click", () => { setManual(true); qInput.focus(); });
-  });
 
   // ==== Confirm check-in (via edge) ====
   async function doConfirm() {
