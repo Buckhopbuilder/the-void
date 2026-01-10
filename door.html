@@ -355,7 +355,27 @@
 
         <div class="sep"></div>
 
-        <label for="q">Search guest</label>
+        
+        <div id="scanSection">
+          <div style="font-weight:800;">Scanner (shell)</div>
+          <div class="muted">Camera scanning is not enabled yet. Paste the scanned payload below to simulate a scan.</div>
+          <div class="sep"></div>
+
+          <label for="scanToken">Scan payload</label>
+          <input id="scanToken" type="text" placeholder="Paste QR payload here…" autocomplete="off" inputmode="text" />
+
+          <div class="row" style="margin-top:10px; gap:8px;">
+            <button id="scanBtn" class="primary">Process scan</button>
+            <button id="toManualBtn">Manual lookup</button>
+          </div>
+
+          <div class="tiny" style="margin-top:8px;">
+            This shell routes you into the existing manual verification flow while we lock scan semantics.
+          </div>
+        </div>
+
+        <div id="manualSection" style="display:none;">
+<label for="q">Search guest</label>
         <input id="q" type="text" placeholder="Start typing name / email / digits…" autocomplete="off" inputmode="text" disabled />
 
         <div class="muted" id="searchStatus" style="margin-top:8px; display:none;"></div>
@@ -375,6 +395,8 @@
           <summary>Result JSON (for debugging)</summary>
           <pre id="debugOut">{}</pre>
         </details>
+        </div>
+
       </div>
     </div>
   </div>
@@ -528,6 +550,11 @@
   const signOutBtn = $("signOutBtn");
 
   const qInput = $("q");
+  const scanToken = $("scanToken");
+  const scanBtn = $("scanBtn");
+  const toManualBtn = $("toManualBtn");
+  const scanSection = $("scanSection");
+  const manualSection = $("manualSection");
   const searchStatus = $("searchStatus");
   const resultsEl = $("results");
   const resultsScroll = $("resultsScroll");
@@ -632,6 +659,10 @@ function clearSelectionOnly() {
     isManual = on;
     modePill.textContent = "Mode: " + (isManual ? "Manual" : "Scanner");
     qInput.disabled = !isManual;
+
+    if(scanSection) scanSection.style.display = isManual ? "none" : "";
+    if(manualSection) manualSection.style.display = isManual ? "" : "none";
+
     if(!isManual) {
       clearAll();
     } else {
@@ -866,7 +897,7 @@ function clearSelectionOnly() {
 
   async function doSearchNow() {
     const q = qInput.value.trim();
-    if(!isManual) return;
+    if(!isManual) return [];
 
     if(q.length < 2) {
       resultsMeta.textContent = "Type 2+ chars.";
@@ -874,7 +905,7 @@ function clearSelectionOnly() {
       resultsEl.innerHTML = "";
       hide(resultsScroll);
       hide(searchStatus);
-      return;
+      return [];
     }
 
     show(searchStatus);
@@ -898,11 +929,44 @@ function clearSelectionOnly() {
 
     debugOut.textContent = JSON.stringify({ ok:true, used: res.used, count: arr.length, raw: raw }, null, 2);
     renderCandidates(arr);
+    return arr;
   }
 
   qInput.addEventListener("input", () => {
     if(searchTimer) clearTimeout(searchTimer);
     searchTimer = setTimeout(doSearchNow, DEBOUNCE_MS);
+
+  // ==== Scan shell (paste-to-scan) ====
+  async function processScanToken() {
+    const token = (scanToken?.value || "").trim();
+    if(!token) {
+      showOverlay("warn", "No scan payload", "Paste a QR payload, then tap Process scan.", [
+        { text:"Close", cls:"primary", onClick: () => { hideOverlay(); } },
+      ]);
+      return;
+    }
+
+    // For now: route into the existing manual lookup flow (no backend scan endpoint yet).
+    setManual(true);
+    qInput.value = token;
+
+    const arr = await doSearchNow();
+
+    // If we got exactly one match, auto-select it to reduce taps.
+    if(Array.isArray(arr) && arr.length === 1) {
+      selectCandidate(arr[0]);
+    }
+
+    showOverlay(
+      "good",
+      "Scan received",
+      "Switched to Manual lookup. Verify the selected guest to complete check-in.",
+      [{ text:"Continue", cls:"primary", onClick: () => { hideOverlay(); } }]
+    );
+  }
+
+  if(scanBtn) scanBtn.addEventListener("click", processScanToken);
+  if(toManualBtn) toManualBtn.addEventListener("click", () => { setManual(true); qInput.focus(); });
   });
 
   // ==== Confirm check-in (via edge) ====
