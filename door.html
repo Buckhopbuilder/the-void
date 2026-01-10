@@ -334,7 +334,7 @@
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v10</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v11</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -373,7 +373,7 @@
           </div>
 
           <div class="tiny" style="margin-top:10px; opacity:.8;">
-            This shell routes you into the existing manual verification flow while we lock scan semantics.
+            Scan resolves the token via backend then performs an atomic check-in. Manual fallback remains available.
           </div>
 
           <div class="sep"></div>
@@ -761,16 +761,178 @@ function clearSelectionOnly() {
     ]);
   }
 
+
+  async function rpcResolveScanToken(token) {
+    const attempts = [
+      { fn: "door_resolve_scan_token", args: { p_token: token } },
+      { fn: "door_resolve_scan_token", args: { token: token } },
+      { fn: "door_resolve_scan_token", args: { p_scan_token: token } },
+      { fn: "door_resolve_scan_token", args: { scan_token: token } },
+      { fn: "door_resolve_scan_token", args: { value: token } },
+    ];
+    let lastErr = null;
+    for (const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if (error) throw error;
+        // Table-returning RPCs often come back as an array with 0/1 rows.
+        const row = Array.isArray(data) ? (data[0] || null) : data;
+        return { ok: true, row, used: a.args };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    return { ok: false, error: lastErr };
+  }
+
+  async function rpcDoorCheckinAtomic(registrationId, method) {
+    const attempts = [
+      { fn: "door_checkin_atomic", args: { p_registration_id: registrationId, p_method: method } },
+      { fn: "door_checkin_atomic", args: { registration_id: registrationId, method: method } },
+      { fn: "door_checkin_atomic", args: { p_registration_id: registrationId, method: method } },
+      { fn: "door_checkin_atomic", args: { registration_id: registrationId, p_method: method } },
+      { fn: "door_checkin_atomic", args: { p_reg_id: registrationId, p_method: method } },
+      { fn: "door_checkin_atomic", args: { reg_id: registrationId, method: method } },
+    ];
+    let lastErr = null;
+    for (const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if (error) throw error;
+        const row = Array.isArray(data) ? (data[0] || null) : data;
+        return { ok: true, row, used: a.args };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    return { ok: false, error: lastErr };
+  }
+
+  function haptic(kind) {
+    try {
+      if (!navigator.vibrate) return;
+      if (kind === "good") navigator.vibrate(35);
+      else if (kind === "warn") navigator.vibrate([20, 40, 20]);
+      else if (kind === "bad") navigator.vibrate([60, 30, 60]);
+    } catch (_e) {}
+  }
+
+
   if(processScanBtn) {
-    processScanBtn.addEventListener("click", () => {
-      const term = normalizeScanInput(scanPayload?.value || "");
-      if(!term) {
+    processScanBtn.addEventListener("click", async () => {
+      const raw = normalizeScanInput(scanPayload?.value || "");
+      if(!raw) {
         showOverlay("warn", "No scan payload", "Paste a QR payload first.", [
           { text: "OK", cls: "primary", onClick: () => hideOverlay() },
         ]);
         return;
       }
-      routeScanToManual(term);
+
+      // Prevent double-taps
+      processScanBtn.disabled = true;
+
+      showOverlay("warn", "Processing scan…", "Resolving token with backend.", [
+        { text: "Cancel", cls: "", onClick: () => { processScanBtn.disabled = false; hideOverlay(); } },
+      ]);
+
+      try {
+        // 1) Resolve token -> registration_id (active event enforced server-side)
+        const r = await rpcResolveScanToken(raw);
+        if(!r.ok || !r.row) {
+          showOverlay("bad", "Scan failed", "Resolver call failed. Use Manual lookup if needed.", [
+            { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+            { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("bad");
+          return;
+        }
+
+        const row = r.row;
+        if(!row.ok) {
+          const code = row.error || "invalid_token";
+          let msg = "Scan token invalid.";
+          if(code === "no_active_event") msg = "No active event.";
+          else if(code === "token_expired") msg = "Scan token expired.";
+          else if(code === "token_used") msg = "Scan token already used.";
+          else if(code === "invalid_token") msg = "Invalid scan token.";
+
+          showOverlay("warn", "Scan not accepted", msg, [
+            { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+            { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("warn");
+          return;
+        }
+
+        const rid = row.registration_id;
+        if(!rid) {
+          showOverlay("bad", "Scan failed", "Resolved token did not return a registration id.", [
+            { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("bad");
+          return;
+        }
+
+        // 2) Atomic check-in
+        const c = await rpcDoorCheckinAtomic(rid, "scan");
+        if(!c.ok || !c.row) {
+          showOverlay("bad", "Check-in failed", "door_checkin_atomic call failed.", [
+            { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("bad");
+          return;
+        }
+
+        const crow = c.row;
+        if(crow.ok) {
+          haptic("good");
+          showOverlay("good", "Checked in", "Scan check-in successful.", [
+            { text: "Next guest", cls: "good", onClick: () => {
+                hideOverlay();
+                processScanBtn.disabled = false;
+                if(scanPayload) scanPayload.value = "";
+                try { scanPayload.focus(); } catch(_e) {}
+              } 
+            },
+            { text: "Close", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          ]);
+          return;
+        }
+
+        // Expected error codes
+        const err = crow.error || "not_verified";
+        if(err === "already_checked_in") {
+          const at = crow.checked_in_at ? (" at " + String(crow.checked_in_at).replace("T"," ").replace("Z","")) : "";
+          haptic("warn");
+          showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
+            { text: "Next guest", cls: "good", onClick: () => {
+                hideOverlay();
+                processScanBtn.disabled = false;
+                if(scanPayload) scanPayload.value = "";
+                try { scanPayload.focus(); } catch(_e) {}
+              } 
+            },
+            { text: "Close", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          ]);
+          return;
+        }
+
+        haptic("warn");
+        showOverlay("warn", "Not checked in", (err ? (err + ".") : "Not verified."), [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+        ]);
+      } catch (e) {
+        haptic("bad");
+        showOverlay("bad", "Scan error", String(e?.message || e), [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+        ]);
+      } finally {
+        // If overlay is still up, button state is controlled by overlay actions.
+        // Ensure it isn't stuck disabled if something unexpected happened.
+        // (Overlay Cancel/Try again/Close also re-enables.)
+      }
     });
   }
 
