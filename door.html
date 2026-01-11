@@ -1314,10 +1314,23 @@ const trace = {
       // Prevent double-taps
       processScanBtn.disabled = true;
 
+      // Trace that the click handler actually fired (helps diagnose "nothing happened")
+      trace.outcome = { stage: "clicked", overlayVisible: typeof overlayVisible !== "undefined" ? overlayVisible : null };
+      if(scanDebugOn) pushScanDebug(trace);
+
       showOverlay("warn", "Processing scan…", "Resolving token with backend.", [
         { text: "Cancel", cls: "", onClick: () => { processScanBtn.disabled = false; hideOverlay(); } },
       ]);
 
+      // Safety: if overlay cannot render for any reason, don't leave the button disabled forever
+      setTimeout(() => {
+        try {
+          if(typeof overlayVisible !== "undefined" && overlayVisible) return;
+          processScanBtn.disabled = false;
+        } catch (_e) {
+          processScanBtn.disabled = false;
+        }
+      }, 80);
       try {
         // 1) Resolve token -> registration_id (active event enforced server-side)
         const r = await rpcResolveScanToken(raw);
