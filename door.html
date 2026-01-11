@@ -366,6 +366,8 @@
             </div>
             <div class="row" style="justify-content:flex-end; gap:8px;">
               <button id="goManualBtn" class="primary">Manual lookup</button>
+              <button id="scanToggleDebug">Debug</button>
+              <button id="copyScanDebug" title="Copy scan debug log">Copy</button>
             </div>
           </div>
 
@@ -384,7 +386,16 @@
           </div>
 
           <div class="sep"></div>
-        </div>
+        
+          <details id="scanDebugDetails" style="display:none; margin-top:12px;">
+            <summary>Scan Debug (trace log)</summary>
+            <div class="row" style="justify-content:flex-end; gap:8px; margin-top:8px;">
+              <button id="clearScanDebug" title="Clear scan debug log">Clear</button>
+            </div>
+            <pre id="scanDebugOut">[]</pre>
+          </details>
+
+</div>
 <div id="manualBlock">
 <div class="resultsHeader">
           <div>
@@ -589,6 +600,12 @@
   const clearScanBtn = $("clearScanBtn");
   const goManualBtn = $("goManualBtn");
 
+  const scanToggleDebug = $("scanToggleDebug");
+  const scanDebugDetails = $("scanDebugDetails");
+  const scanDebugOut = $("scanDebugOut");
+  const copyScanDebug = $("copyScanDebug");
+  const clearScanDebug = $("clearScanDebug");
+
 
   const selTitle = $("selTitle");
   const selSub = $("selSub");
@@ -612,6 +629,35 @@
   let activeEventId = null;
   let isManual = false;
   let mode = "scan"; // "scan" | "manual"
+
+
+let scanDebugOn = false;
+const scanDebugLog = [];
+const MAX_SCAN_DEBUG = 25;
+
+function renderScanDebug() {
+  if(!scanDebugOut) return;
+  scanDebugOut.textContent = JSON.stringify(scanDebugLog, null, 2);
+}
+
+function pushScanDebug(entry) {
+  scanDebugLog.unshift(entry);
+  if(scanDebugLog.length > MAX_SCAN_DEBUG) scanDebugLog.length = MAX_SCAN_DEBUG;
+  renderScanDebug();
+}
+
+async function copyTextToClipboard(txt) {
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }
+  } catch(_e) {}
+  // Fallback: prompt for manual copy
+  try { window.prompt("Copy debug:", txt); } catch(_e) {}
+  return false;
+}
+
 
   function applyMode() {
     document.body.classList.toggle("mode-scan", mode === "scan");
@@ -743,6 +789,33 @@ function clearSelectionOnly() {
     debugDetails.style.display = debugOn ? "" : "none";
   });
 
+
+// ==== Scan debug toggle (visible in scanner mode) ====
+function setScanDebug(on) {
+  scanDebugOn = !!on;
+  if(scanDebugDetails) scanDebugDetails.style.display = scanDebugOn ? "" : "none";
+  if(scanToggleDebug) scanToggleDebug.classList.toggle("on", scanDebugOn);
+  if(scanToggleDebug) scanToggleDebug.textContent = scanDebugOn ? "Debug: On" : "Debug";
+  if(scanDebugOn) renderScanDebug();
+}
+
+if(scanToggleDebug) {
+  scanToggleDebug.addEventListener("click", () => setScanDebug(!scanDebugOn));
+}
+if(copyScanDebug) {
+  copyScanDebug.addEventListener("click", async () => {
+    const txt = JSON.stringify(scanDebugLog, null, 2);
+    await copyTextToClipboard(txt);
+  });
+}
+if(clearScanDebug) {
+  clearScanDebug.addEventListener("click", () => {
+    scanDebugLog.length = 0;
+    renderScanDebug();
+  });
+}
+
+
   // ==== Scanner shell handlers ====
   function normalizeScanInput(raw) {
     const s = String(raw||"").trim();
@@ -829,6 +902,16 @@ function clearSelectionOnly() {
   if(processScanBtn) {
     processScanBtn.addEventListener("click", async () => {
       const raw = normalizeScanInput(scanPayload?.value || "");
+
+const trace = {
+  ts: new Date().toISOString(),
+  raw_input: String(scanPayload?.value || ""),
+  normalized_token: raw,
+  resolver: null,
+  checkin: null,
+  outcome: null
+};
+
       if(!raw) {
         showOverlay("warn", "No scan payload", "Paste a QR payload first.", [
           { text: "OK", cls: "primary", onClick: () => hideOverlay() },
@@ -846,7 +929,10 @@ function clearSelectionOnly() {
       try {
         // 1) Resolve token -> registration_id (active event enforced server-side)
         const r = await rpcResolveScanToken(raw);
+        trace.resolver = { ok: r.ok, used: r.used, row: r.row || null, error: r.ok ? null : String(r.error?.message || r.error || "unknown") };
         if(!r.ok || !r.row) {
+          trace.outcome = { ok:false, code:"resolver_failed" };
+          if(scanDebugOn) pushScanDebug(trace);
           showOverlay("bad", "Scan failed", "Resolver call failed. Use Manual lookup if needed.", [
             { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
             { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
@@ -864,6 +950,8 @@ function clearSelectionOnly() {
           else if(code === "token_used") msg = "Scan token already used.";
           else if(code === "invalid_token") msg = "Invalid scan token.";
 
+          trace.outcome = { ok:false, code: code };
+          if(scanDebugOn) pushScanDebug(trace);
           showOverlay("warn", "Scan not accepted", msg, [
             { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
             { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
@@ -874,6 +962,8 @@ function clearSelectionOnly() {
 
         const rid = row.registration_id;
         if(!rid) {
+          trace.outcome = { ok:false, code:"missing_registration_id" };
+          if(scanDebugOn) pushScanDebug(trace);
           showOverlay("bad", "Scan failed", "Resolved token did not return a registration id.", [
             { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
           ]);
@@ -883,7 +973,10 @@ function clearSelectionOnly() {
 
         // 2) Atomic check-in
         const c = await rpcDoorCheckinAtomic(rid, "scan");
+        trace.checkin = { ok: c.ok, used: c.used, row: c.row || null, error: c.ok ? null : String(c.error?.message || c.error || "unknown") };
         if(!c.ok || !c.row) {
+          trace.outcome = { ok:false, code:"checkin_call_failed" };
+          if(scanDebugOn) pushScanDebug(trace);
           showOverlay("bad", "Check-in failed", "door_checkin_atomic call failed.", [
             { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
           ]);
@@ -893,6 +986,8 @@ function clearSelectionOnly() {
 
         const crow = c.row;
         if(crow.ok) {
+          trace.outcome = { ok:true, code:"checked_in" };
+          if(scanDebugOn) pushScanDebug(trace);
           haptic("good");
           showOverlay("good", "Checked in", "Scan check-in successful.", [
             { text: "Next guest", cls: "good", onClick: () => {
@@ -910,6 +1005,8 @@ function clearSelectionOnly() {
         // Expected error codes
         const err = crow.error || "not_verified";
         if(err === "already_checked_in") {
+          trace.outcome = { ok:false, code:"already_checked_in", checked_in_at: crow.checked_in_at || null };
+          if(scanDebugOn) pushScanDebug(trace);
           const at = crow.checked_in_at ? (" at " + String(crow.checked_in_at).replace("T"," ").replace("Z","")) : "";
           haptic("warn");
           showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
@@ -925,12 +1022,16 @@ function clearSelectionOnly() {
           return;
         }
 
+        trace.outcome = { ok:false, code: err };
+        if(scanDebugOn) pushScanDebug(trace);
         haptic("warn");
         showOverlay("warn", "Not checked in", (err ? (err + ".") : "Not verified."), [
           { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
           { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
         ]);
       } catch (e) {
+        trace.outcome = { ok:false, code:"exception", message: String(e?.message || e) };
+        if(scanDebugOn) pushScanDebug(trace);
         haptic("bad");
         showOverlay("bad", "Scan error", String(e?.message || e), [
           { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
@@ -1371,6 +1472,7 @@ function clearSelectionOnly() {
     applyMode();
     setVerifyMode("phone");
     setSheetIdle(true);
+    setScanDebug(false);
   })();
 
 })();
