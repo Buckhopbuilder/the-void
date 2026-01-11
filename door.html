@@ -1258,6 +1258,27 @@ if(clearScanDebug) {
       }
     }
     return { ok: false, error: lastErr };
+
+  async function rpcDoorGetDisplayHint(registrationId) {
+    const attempts = [
+      { fn: "door_get_display_hint", args: { p_registration_id: registrationId } },
+      { fn: "door_get_display_hint", args: { registration_id: registrationId } },
+      { fn: "door_get_display_hint", args: { p_reg_id: registrationId } },
+      { fn: "door_get_display_hint", args: { reg_id: registrationId } },
+    ];
+    let lastErr = null;
+    for (const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if (error) throw error;
+        const row = Array.isArray(data) ? (data[0] || null) : data;
+        return { ok: true, row, used: a.args };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    return { ok: false, error: lastErr };
+  }
   }
 
   function haptic(kind) {
@@ -1360,7 +1381,18 @@ const trace = {
           trace.outcome = { ok:true, code:"checked_in" };
           if(scanDebugOn) pushScanDebug(trace);
           haptic("good");
-          showOverlay("good", "Checked in", "Scan check-in successful.", [
+          let successMsg = "Scan check-in successful.";
+          try {
+            const d = await rpcDoorGetDisplayHint(rid);
+            trace.display = { ok: d.ok, used: d.used, row: d.row || null, error: d.ok ? null : String(d.error?.message || d.error || "unknown") };
+            if(d.ok && d.row && d.row.ok) {
+              const dn = (d.row.display_name || "").trim();
+              const hv = (d.row.hint_value || "").trim();
+              if(dn && hv) successMsg = `Checked in: ${dn} • ${hv}`;
+              else if(dn) successMsg = `Checked in: ${dn}`;
+            }
+          } catch(_e) {}
+          showOverlay("good", "Checked in", successMsg, [
             { text: "Next guest", cls: "good", onClick: () => {
                 hideOverlay();
                 processScanBtn.disabled = false;
