@@ -348,7 +348,7 @@ window.__BUILD = "v12.2";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.3 (offline pack + sign-in)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.4 (offline pack + sign-in)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -506,6 +506,28 @@ window.__BUILD = "v12.2";
     </div>
   </div>
 
+
+  <!-- Auth modal -->
+  <div id="authModal" style="display:none; position:fixed; inset:0; z-index:9999;">
+    <div style="position:absolute; inset:0; background:rgba(0,0,0,.55);"></div>
+    <div class="card" style="position:relative; max-width:520px; margin:10vh auto 0; padding:16px;">
+      <div class="row" style="justify-content:space-between; align-items:center; gap:10px;">
+        <div style="font-weight:800; font-size:18px;">Sign in</div>
+        <button id="authModalClose" title="Close">Close</button>
+      </div>
+      <div class="tiny muted" style="margin-top:6px;">
+        Sends a magic link to your email. Open the link on this device to complete sign-in.
+      </div>
+      <div style="margin-top:12px;">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" placeholder="you@company.com" autocomplete="email" inputmode="email" />
+      </div>
+      <div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
+        <button id="authSendLinkBtn" class="primary">Send link</button>
+      </div>
+      <div id="authModalMsg" class="tiny" style="margin-top:10px; opacity:.9;"></div>
+    </div>
+  </div>
 
 <script>
 
@@ -1800,9 +1822,9 @@ const trace = {
     if(ok) return signOut();
     openAuthModal();
   });
-  authModalClose.addEventListener("click", closeAuthModal);
-  authModal.addEventListener("click", (e) => { if(e.target === authModal.firstElementChild) closeAuthModal(); });
-  authSendLinkBtn.addEventListener("click", sendMagicLink);
+  if(authModalClose) authModalClose.addEventListener("click", closeAuthModal);
+  if(authModal) authModal.addEventListener("click", (e) => { if(e.target === authModal.firstElementChild) closeAuthModal(); });
+  if(authSendLinkBtn) authSendLinkBtn.addEventListener("click", sendMagicLink);
 
   (async () => {
     await ensureAuth();
@@ -1819,28 +1841,6 @@ const trace = {
 })();
 
 </script>
-
-  <!-- Auth modal -->
-  <div id="authModal" style="display:none; position:fixed; inset:0; z-index:9999;">
-    <div style="position:absolute; inset:0; background:rgba(0,0,0,.55);"></div>
-    <div class="card" style="position:relative; max-width:520px; margin:10vh auto 0; padding:16px;">
-      <div class="row" style="justify-content:space-between; align-items:center; gap:10px;">
-        <div style="font-weight:800; font-size:18px;">Sign in</div>
-        <button id="authModalClose" title="Close">Close</button>
-      </div>
-      <div class="tiny muted" style="margin-top:6px;">
-        Sends a magic link to your email. Open the link on this device to complete sign-in.
-      </div>
-      <div style="margin-top:12px;">
-        <label for="authEmail">Email</label>
-        <input id="authEmail" type="email" placeholder="you@company.com" autocomplete="email" inputmode="email" />
-      </div>
-      <div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
-        <button id="authSendLinkBtn" class="primary">Send link</button>
-      </div>
-      <div id="authModalMsg" class="tiny" style="margin-top:10px; opacity:.9;"></div>
-    </div>
-  </div>
 
 </body>
 </html>
