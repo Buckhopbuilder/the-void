@@ -757,40 +757,70 @@ function openOfflineDB() {
   });
 }
 
+
+function withTimeout(promise, ms, message) {
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error(message || `Timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([
+    promise.finally(() => { try { clearTimeout(t); } catch(_e) {} }),
+    timeout
+  ]);
+}
+
 async function idbGetOfflinePack(eventId) {
   const db = await openOfflineDB();
-  return new Promise((resolve, reject) => {
+  const op = new Promise((resolve, reject) => {
     const tx = db.transaction(OFFLINE_STORE, "readonly");
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB tx error"));
+
     const store = tx.objectStore(OFFLINE_STORE);
     const req = store.get(eventId);
+
     req.onsuccess = () => resolve(req.result || null);
-    req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    req.onerror = () => reject(req.error || new Error("IndexedDB get error"));
+
+    tx.oncomplete = () => { try { db.close(); } catch(_e) {} };
   });
+  return withTimeout(op, 2500, "IndexedDB read timed out");
 }
 
 async function idbPutOfflinePack(pack) {
   const db = await openOfflineDB();
-  return new Promise((resolve, reject) => {
+  const op = new Promise((resolve, reject) => {
     const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB tx error"));
+
     const store = tx.objectStore(OFFLINE_STORE);
     const req = store.put(pack);
+
     req.onsuccess = () => resolve(true);
-    req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    req.onerror = () => reject(req.error || new Error("IndexedDB put error"));
+
+    tx.oncomplete = () => { try { db.close(); } catch(_e) {} };
   });
+  return withTimeout(op, 2500, "IndexedDB write timed out");
 }
 
 async function idbDeleteOfflinePack(eventId) {
   const db = await openOfflineDB();
-  return new Promise((resolve, reject) => {
+  const op = new Promise((resolve, reject) => {
     const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB tx error"));
+
     const store = tx.objectStore(OFFLINE_STORE);
     const req = store.delete(eventId);
+
     req.onsuccess = () => resolve(true);
-    req.onerror = () => reject(req.error);
-    tx.oncomplete = () => db.close();
+    req.onerror = () => reject(req.error || new Error("IndexedDB delete error"));
+
+    tx.oncomplete = () => { try { db.close(); } catch(_e) {} };
   });
+  return withTimeout(op, 2500, "IndexedDB delete timed out");
 }
 
 async function refreshOfflinePackStatus() {
