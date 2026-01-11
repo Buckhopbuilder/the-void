@@ -1,10 +1,17 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>VoidPass — Door</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+// Build stamp
+window.__BUILD = "v12.2";
+</script>
   <style>
     :root {
       --bg:#0b1020;
@@ -341,7 +348,7 @@
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.1 (offline pack panel)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.3 (offline pack + sign-in)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -351,7 +358,7 @@
           Hold: Manual
           <div class="bar"><i id="holdBar"></i></div>
         </button>
-        <button id="signOutBtn">Sign out</button>
+        <button id="authBtn">Sign in</button>
       </div>
     </div>
 
@@ -597,7 +604,12 @@
   const eventPill = $("eventPill");
   const manualHoldBtn = $("manualHold");
   const holdBar = $("holdBar");
-  const signOutBtn = $("signOutBtn");
+  const authBtn = $("authBtn");
+  const authModal = $("authModal");
+  const authModalClose = $("authModalClose");
+  const authSendLinkBtn = $("authSendLinkBtn");
+  const authEmail = $("authEmail");
+  const authModalMsg = $("authModalMsg");
 
   const qInput = $("q");
   const searchStatus = $("searchStatus");
@@ -992,11 +1004,43 @@ function clearSelectionOnly() {
     if(email) {
       setPill(authPill, "good", "Signed in");
       authPill.title = email;
+      if(authBtn) authBtn.textContent = "Sign out";
       return true;
     }
     setPill(authPill, "bad", "Not signed in");
     authPill.title = "";
+    if(authBtn) authBtn.textContent = "Sign in";
     return false;
+  }
+
+  function openAuthModal() {
+    if(!authModal) return;
+    authModalMsg.textContent = "";
+    authEmail.value = authEmail.value || "";
+    authModal.style.display = "block";
+    setTimeout(() => { try { authEmail.focus(); } catch(_e) {} }, 50);
+  }
+
+  function closeAuthModal() {
+    if(!authModal) return;
+    authModal.style.display = "none";
+  }
+
+  async function sendMagicLink() {
+    const email = (authEmail.value || "").trim();
+    if(!email) { authModalMsg.textContent = "Enter an email."; return; }
+    authSendLinkBtn.disabled = true;
+    authModalMsg.textContent = "Sending…";
+    try {
+      const redirectTo = location.origin + location.pathname;
+      const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: redirectTo } });
+      if(error) throw error;
+      authModalMsg.textContent = "Link sent. Check your email and open it on this phone.";
+    } catch (e) {
+      authModalMsg.textContent = "Sign-in failed: " + (e?.message || String(e));
+    } finally {
+      authSendLinkBtn.disabled = false;
+    }
   }
 
   async function signOut() {
@@ -1751,7 +1795,14 @@ const trace = {
   });
 
   // ==== Init ====
-  signOutBtn.addEventListener("click", signOut);
+  authBtn.addEventListener("click", async () => {
+    const ok = await ensureAuth();
+    if(ok) return signOut();
+    openAuthModal();
+  });
+  authModalClose.addEventListener("click", closeAuthModal);
+  authModal.addEventListener("click", (e) => { if(e.target === authModal.firstElementChild) closeAuthModal(); });
+  authSendLinkBtn.addEventListener("click", sendMagicLink);
 
   (async () => {
     await ensureAuth();
@@ -1768,5 +1819,28 @@ const trace = {
 })();
 
 </script>
+
+  <!-- Auth modal -->
+  <div id="authModal" style="display:none; position:fixed; inset:0; z-index:9999;">
+    <div style="position:absolute; inset:0; background:rgba(0,0,0,.55);"></div>
+    <div class="card" style="position:relative; max-width:520px; margin:10vh auto 0; padding:16px;">
+      <div class="row" style="justify-content:space-between; align-items:center; gap:10px;">
+        <div style="font-weight:800; font-size:18px;">Sign in</div>
+        <button id="authModalClose" title="Close">Close</button>
+      </div>
+      <div class="tiny muted" style="margin-top:6px;">
+        Sends a magic link to your email. Open the link on this device to complete sign-in.
+      </div>
+      <div style="margin-top:12px;">
+        <label for="authEmail">Email</label>
+        <input id="authEmail" type="email" placeholder="you@company.com" autocomplete="email" inputmode="email" />
+      </div>
+      <div class="row" style="margin-top:12px; justify-content:flex-end; gap:8px;">
+        <button id="authSendLinkBtn" class="primary">Send link</button>
+      </div>
+      <div id="authModalMsg" class="tiny" style="margin-top:10px; opacity:.9;"></div>
+    </div>
+  </div>
+
 </body>
 </html>
