@@ -341,7 +341,7 @@
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.0 (offline pack panel)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.1 (offline pack panel)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -695,18 +695,64 @@ function setOfflinePackUI(state) {
 
 function openOfflineDB() {
   return new Promise((resolve, reject) => {
+    // Guard: IndexedDB may be unavailable in some privacy modes
+    if(typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+
+    let settled = false;
+    const fail = (err) => {
+      if(settled) return;
+      settled = true;
+      try { clearTimeout(timer); } catch(_e) {}
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+    const succeed = (db) => {
+      if(settled) return;
+      settled = true;
+      try { clearTimeout(timer); } catch(_e) {}
+      resolve(db);
+    };
+
+    // If something goes wrong (blocked upgrade, browser oddities), don't hang forever.
+    const timer = setTimeout(() => {
+      fail(new Error("IndexedDB open timed out (possibly blocked by another tab)"));
+    }, 2500);
+
     try {
       const req = indexedDB.open(OFFLINE_DB_NAME, OFFLINE_DB_VERSION);
+
       req.onupgradeneeded = () => {
-        const db = req.result;
-        if(!db.objectStoreNames.contains(OFFLINE_STORE)) {
-          db.createObjectStore(OFFLINE_STORE, { keyPath: "event_id" });
+        try {
+          const db = req.result;
+          if(!db.objectStoreNames.contains(OFFLINE_STORE)) {
+            db.createObjectStore(OFFLINE_STORE, { keyPath: "event_id" });
+          }
+        } catch(e) {
+          try { req.transaction && req.transaction.abort(); } catch(_e) {}
+          fail(e);
         }
       };
-      req.onsuccess = () => resolve(req.result);
-      req.onerror = () => reject(req.error);
+
+      req.onblocked = () => {
+        fail(new Error("IndexedDB upgrade blocked (close other VoidPass Door tabs)"));
+      };
+
+      req.onsuccess = () => {
+        const db = req.result;
+        // If the DB version changes in another tab, close cleanly.
+        try {
+          db.onversionchange = () => { try { db.close(); } catch(_e) {} };
+        } catch(_e) {}
+        succeed(db);
+      };
+
+      req.onerror = () => {
+        fail(req.error || new Error("IndexedDB error"));
+      };
     } catch(e) {
-      reject(e);
+      fail(e);
     }
   });
 }
