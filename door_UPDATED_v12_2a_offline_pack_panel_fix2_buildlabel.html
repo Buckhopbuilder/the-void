@@ -1,0 +1,1779 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>VoidPass — Door</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
+// Build stamp
+window.__BUILD = "v12.2";
+</script>
+  <style>
+    :root {
+      --bg:#0b1020;
+      --panel:rgba(255,255,255,.06);
+      --panel2:rgba(255,255,255,.08);
+      --border:rgba(255,255,255,.10);
+      --text:#e8eefc;
+      --muted:rgba(232,238,252,.75);
+      --good:rgba(16,185,129,.18);
+      --warn:rgba(245,158,11,.18);
+      --bad:rgba(239,68,68,.20);
+      --goodStroke:rgba(16,185,129,.55);
+      --warnStroke:rgba(245,158,11,.55);
+      --badStroke:rgba(239,68,68,.55);
+      --pill:rgba(255,255,255,.10);
+      --shadow: 0 10px 35px rgba(0,0,0,.35);
+      --r:16px;
+      --pad:14px;
+
+      /* Layout safety: space reserved for the bottom sheet */
+      --sheet-safe: 260px;
+
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
+    }
+    * { box-sizing:border-box; }
+    html,body { height:100%; }
+    body {
+      margin:0;
+      background: radial-gradient(1000px 600px at 30% 0%, rgba(56,189,248,.14), transparent 60%),
+                  radial-gradient(900px 600px at 80% 20%, rgba(167,139,250,.12), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+
+      /* Bottom padding no longer hard-coded; candidatesWrap handles it */
+      padding: calc(env(safe-area-inset-top) + 10px) 10px calc(env(safe-area-inset-bottom) + 10px) 10px;
+    }
+    .wrap { max-width: 820px; margin:0 auto; }
+
+    .topbar {
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      padding: 10px 12px;
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      position: sticky; top: 10px; z-index: 5;
+      backdrop-filter: blur(10px);
+    }
+    .brand { font-weight:700; letter-spacing:.2px; }
+    .pills { display:flex; gap:8px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
+    .pill {
+      padding: 6px 10px;
+      font-size: 12px;
+      border-radius:999px;
+      background: var(--pill);
+      border:1px solid var(--border);
+      color: var(--muted);
+      user-select:none;
+      white-space:nowrap;
+    }
+    .pill.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    .pill.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    .pill.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
+
+    .grid { display:grid; gap:12px; margin-top:12px; }
+    .card {
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius: var(--r);
+      box-shadow: var(--shadow);
+      padding: var(--pad);
+    }
+    label { display:block; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    input[type="text"], input[type="password"] {
+      width:100%;
+      padding: 12px 12px;
+      border-radius: 12px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.25);
+      color: var(--text);
+      outline:none;
+      font-size:16px;
+    }
+    input::placeholder { color: rgba(232,238,252,.45); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .row > * { flex: 1 1 auto; }
+    button {
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.10);
+      color: var(--text);
+      padding: 12px 14px;
+      border-radius: 12px;
+      font-size: 14px;
+      cursor:pointer;
+      user-select:none;
+      touch-action:manipulation;
+    }
+    button.primary { background: rgba(56,189,248,.18); border-color: rgba(56,189,248,.40); }
+    button.danger { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.45); }
+    button.good { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.45); }
+    button:disabled { opacity:.55; cursor:not-allowed; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .tiny { color: var(--muted); font-size: 12px; }
+    .sep { height:1px; background: rgba(255,255,255,.10); margin: 12px 0; }
+
+    /* Live results list */
+    .resultsHeader { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .results { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+    .cand {
+      padding: 12px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(0,0,0,.22);
+      display:flex; align-items:flex-start; justify-content:space-between; gap:12px;
+    }
+    .cand:active { transform: translateY(1px); }
+    .cand .left { min-width: 0; }
+    .cand .name { font-weight:700; font-size:16px; line-height:1.15; }
+    .cand .meta { margin-top:6px; color: var(--muted); font-size: 12px; display:flex; gap:8px; flex-wrap:wrap; }
+    .tag {
+      padding: 4px 8px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+    }
+    .tag.warn { border-color: var(--warnStroke); background: var(--warn); color:#fff4d7; }
+    .tag.good { border-color: var(--goodStroke); background: var(--good); color:#d9fff1; }
+    .tag.bad  { border-color: var(--badStroke);  background: var(--bad);  color:#ffe0e0; }
+    .cand .right { text-align:right; }
+    
+    .cand button { padding: 10px 12px; border-radius: 12px; }
+
+    /* Already-checked-in candidates: visually "final" + view-only */
+    .cand.checked { opacity: .62; }
+    .cand.checked .name { font-weight: 700; }
+    .cand.checked .tag.warn { background: rgba(245,158,11,.14); }
+    button.viewOnly { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.10); }
+
+    .scroll { max-height: 55vh; overflow:auto; padding-right:2px; }
+    @media (max-height: 760px) {
+      .scroll { max-height: 48vh; }
+    }
+
+    /* ====== Critical: prevent sheet from covering candidates ====== */
+    #candidatesWrap {
+      padding-bottom: var(--sheet-safe);
+    }
+    @media (max-width: 520px){
+      :root { --sheet-safe: 300px; }
+    }
+
+    
+    @media (max-width: 520px){
+      .topbar { position: static; top: auto; }
+    }
+/* Bottom sheet verify */
+    .sheet {
+      position: fixed;
+      left: 0; right:0; bottom: 0;
+      padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px) 10px;
+      z-index: 10;
+    }
+    .sheetInner {
+      max-width: 820px; margin:0 auto;
+      background: rgba(11,16,32,.92);
+      border: 1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      box-shadow: 0 14px 60px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      padding: 12px;
+
+      /* Keep sheet from becoming a wall */
+      max-height: 40vh;
+      overflow: auto;
+    }
+
+    .sheetTop { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .selectedLine { min-width:0; }
+    .selectedLine .title { font-weight:800; font-size: 14px; }
+    .selectedLine .sub { margin-top:4px; color: var(--muted); font-size: 12px; }
+
+    .modePills { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+    .modePills button { padding: 9px 10px; font-size:12px; }
+    .modePills .on { background: rgba(56,189,248,.22); border-color: rgba(56,189,248,.45); }
+
+    .sheetControls { display:grid; grid-template-columns: 1fr 1fr; gap:10px; margin-top:10px; }
+    .sheetControls .full { grid-column: 1 / -1; }
+
+    .banner {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(255,255,255,.06);
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .banner.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    .banner.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    .banner.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
+
+    details summary { cursor:pointer; color: var(--muted); font-size: 12px; }
+    pre {
+      white-space: pre-wrap;
+      background: rgba(0,0,0,.35);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius: 14px;
+      padding: 10px;
+      font-size: 12px;
+      color: rgba(232,238,252,.82);
+      margin: 8px 0 0 0;
+    }
+
+    /* Manual mode hold */
+    .holdBtn { position:relative; }
+    .holdBtn .bar {
+      position:absolute; left:10px; right:10px; bottom:8px; height:3px;
+      border-radius:999px; background: rgba(255,255,255,.12); overflow:hidden;
+      opacity:.9;
+    }
+    .holdBtn .bar > i {
+      display:block; height:100%; width:0%;
+      background: rgba(56,189,248,.65);
+    }
+
+/* Idle sheet state: keep panel calm until a guest is selected */
+#verifySheet.idle .sheetBody { display:none; }
+#verifySheet.idle .modePills { display:none; }
+#verifySheet.idle .sheetInner {
+  max-height: none;
+  overflow: hidden;
+}
+
+    /* Minimized sheet state (works now because elements exist) */
+    #verifySheet.min .sheetInner {
+      max-height: none;
+      overflow: hidden;
+    }
+    #verifySheet.min .sheetBody {
+      display:none;
+    }
+
+    /* Small utility button style for minimize */
+    .miniBtn {
+      padding: 9px 10px;
+      font-size: 12px;
+      border-radius: 12px;
+    }
+
+    /* Toast (fixed feedback, independent of sheet state) */
+    .toast {
+      position: fixed;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: calc(env(safe-area-inset-bottom) + 88px);
+      z-index: 50;
+      max-width: min(820px, calc(100vw - 24px));
+      width: fit-content;
+      padding: 10px 12px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(11,16,32,.92);
+      color: var(--text);
+      box-shadow: 0 16px 70px rgba(0,0,0,.55);
+      backdrop-filter: blur(12px);
+      font-size: 13px;
+      line-height: 1.25;
+      display: none;
+    }
+    .toast.good { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.45); }
+    .toast.warn { background: rgba(245,158,11,.18); border-color: rgba(245,158,11,.45); }
+    .toast.bad  { background: rgba(239,68,68,.20);  border-color: rgba(239,68,68,.50); }
+    .toast b { font-weight: 800; }
+  
+    /* Result overlay (persistent, blocks list) */
+    .resultOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 50;
+      display: none;
+      padding: 16px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+    }
+    .resultOverlay .box {
+      max-width: 520px;
+      margin: 14vh auto 0 auto;
+      background: rgba(11,16,32,.94);
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 18px;
+      box-shadow: 0 18px 70px rgba(0,0,0,.60);
+      padding: 16px;
+    }
+    .resultOverlay .title {
+      font-weight: 900;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+    .resultOverlay .msg {
+      color: rgba(232,238,252,.85);
+      font-size: 14px;
+      line-height: 1.35;
+      margin-bottom: 14px;
+    }
+    .resultOverlay .actions {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 10px;
+    }
+    .resultOverlay.good .box { border-color: rgba(16,185,129,.55); }
+    .resultOverlay.warn .box { border-color: rgba(245,158,11,.55); }
+    .resultOverlay.bad  .box { border-color: rgba(239,68,68,.55); }
+
+
+    /* Scanner mode layout toggles */
+    body.mode-scan #manualBlock { display:none; }
+    body.mode-scan #verifySheet { display:none; }
+
+    body.mode-manual #scannerBlock { display:none; }
+
+  
+    /* v11.2: prevent accidental switch to manual while scanning */
+    body.mode-scan #manualHoldBtn,
+    body.mode-scan #holdBarWrap {
+      display: none !important;
+    }
+    body.mode-scan #debugBtn { display: none !important; }
+
+</style>
+</head>
+<body class="mode-scan">
+  <div class="wrap" id="candidatesWrap">
+    <div class="topbar">
+      <div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.2 (offline pack panel)</span></div>
+        <div class="tiny" id="eventPill">Event: …</div>
+      </div>
+      <div class="pills">
+        <div class="pill" id="authPill">Auth: …</div>
+        <div class="pill" id="modePill">Mode: Scanner</div>
+        <button id="manualHold" class="holdBtn" title="Hold to enable manual lookup">
+          Hold: Manual
+          <div class="bar"><i id="holdBar"></i></div>
+        </button>
+        <button id="signOutBtn">Sign out</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card" id="scanCard">
+        
+        <div id="scannerBlock">
+          <div class="resultsHeader">
+            <div>
+              <div style="font-weight:800;">Scanner (shell)</div>
+              <div class="muted">Camera scanning isn’t enabled yet. Paste a scanned payload to route into manual search.</div>
+            </div>
+            <div class="row" style="justify-content:flex-end; gap:8px;">
+              <button id="goManualBtn" class="primary">Manual lookup</button>
+              <button id="scanToggleDebug">Debug</button>
+              <button id="copyScanDebug" title="Copy scan debug log">Copy</button>
+            </div>
+          </div>
+
+          
+          <div class="card" id="offlinePackCard" style="margin-top:12px;">
+            <div class="row" style="justify-content:space-between; gap:10px; align-items:flex-start;">
+              <div style="min-width:0;">
+                <div style="font-weight:800;">Offline pack</div>
+                <div class="muted" id="offlinePackStatus">Checking…</div>
+                <div class="muted" id="offlinePackDetails" style="margin-top:6px; display:none;"></div>
+              </div>
+              <div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+                <button id="downloadOfflinePackBtn" class="primary">Download</button>
+                <button id="clearOfflinePackBtn">Clear</button>
+              </div>
+            </div>
+          </div>
+
+<div class="sep"></div>
+
+          <label for="scanPayload">Scan payload</label>
+          <input id="scanPayload" type="text" placeholder="Paste QR payload here…" autocomplete="off" inputmode="text" />
+
+          <div class="row" style="margin-top:10px;">
+            <button id="processScanBtn" class="primary">Process scan</button>
+            <button id="clearScanBtn">Clear</button>
+          </div>
+
+          <div class="tiny" style="margin-top:10px; opacity:.8;">
+            Scan resolves the token via backend then performs an atomic check-in. Manual fallback remains available.
+          </div>
+
+          <div class="sep"></div>
+        
+          <details id="scanDebugDetails" style="display:none; margin-top:12px;">
+            <summary>Scan Debug (trace log)</summary>
+            <div class="row" style="justify-content:flex-end; gap:8px; margin-top:8px;">
+              <button id="clearScanDebug" title="Clear scan debug log">Clear</button>
+            </div>
+            <pre id="scanDebugOut">[]</pre>
+          </details>
+
+</div>
+<div id="manualBlock">
+<div class="resultsHeader">
+          <div>
+            <div style="font-weight:800;">Manual fallback (search)</div>
+            <div class="muted">Hold “Manual” to enable. Type 2+ chars. List updates as you type.</div>
+          </div>
+          <div class="row" style="justify-content:flex-end; gap:8px;">
+            <button id="nextGuestTop" class="good">Next guest</button>
+            <button id="toggleDebug">Debug</button>
+          </div>
+        </div>
+
+        <div class="sep"></div>
+
+        <label for="q">Search guest</label>
+        <input id="q" type="text" placeholder="Start typing name / email / digits…" autocomplete="off" inputmode="text" disabled />
+
+        <div class="muted" id="searchStatus" style="margin-top:8px; display:none;"></div>
+
+        <div class="results" style="margin-top:12px;">
+          <div class="resultsHeader">
+            <div class="muted" id="resultsMeta">No search yet.</div>
+            <div class="muted" id="resultsCount"></div>
+          </div>
+
+          <div class="scroll" id="resultsScroll" style="display:none;">
+            <div id="results"></div>
+          </div>
+        </div>
+
+        <details id="debugDetails" style="display:none; margin-top:12px;">
+          <summary>Result JSON (for debugging)</summary>
+          <pre id="debugOut">{}</pre>
+        </details>
+</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Bottom sheet -->
+  <div class="sheet" id="verifySheet">
+    <div class="sheetInner">
+      <div class="sheetTop">
+        <div class="selectedLine">
+          <div class="title" id="selTitle">No guest selected</div>
+          <div class="sub" id="selSub">Select a guest from the list above.</div>
+        </div>
+        <div class="modePills">
+          <button id="modePhone">Phone last4</button>
+          <button id="modeEmail">Email prefix</button>
+          <button id="sheetToggle" class="miniBtn" title="Minimize/expand panel">Minimize</button>
+        
+          <button id="nextGuestSheet" class="good miniBtn" title="Clear selection and focus search">Next guest</button>
+        </div>
+      </div>
+
+      <div class="sheetBody">
+        <div class="sheetControls">
+          <div id="phoneBlock">
+            <label for="phoneLast4">Phone last 4 digits</label>
+            <input id="phoneLast4" type="text" placeholder="e.g. 4937" inputmode="numeric" />
+          </div>
+          <div id="emailBlock">
+            <label for="emailPrefix">Email prefix</label>
+            <input id="emailPrefix" type="text" placeholder="e.g. jamie" inputmode="text" />
+          </div>
+          <button id="confirmBtn" class="primary full" disabled>Confirm check-in</button>
+          <button id="nextGuest" class="good">Next guest</button>
+        </div>
+
+        <div id="banner" class="banner" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast feedback (success/error) -->
+  <div id="toast" class="toast"></div>
+
+
+  <!-- Persistent result overlay (prevents list distraction) -->
+  <div class="resultOverlay" id="resultOverlay" role="dialog" aria-modal="true" aria-live="assertive">
+    <div class="box">
+      <div class="title" id="ovTitle">Result</div>
+      <div class="msg" id="ovMsg"></div>
+      <div class="actions" id="ovActions"></div>
+    </div>
+  </div>
+
+
+<script>
+
+(() => {
+  // ==== Config ====
+  const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_ma90uwKLz7Igb_xn9nXVwQ_W6k2KfiH";
+
+  const { createClient } = supabase;
+  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // ==== Helpers ====
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+  const maskEmail = (email) => {
+    const e = String(email||"");
+    const at = e.indexOf("@");
+    if(at<=1) return e ? e[0] + "…@" + e.slice(at+1) : "";
+    const local = e.slice(0,at);
+    const domain = e.slice(at+1);
+    return local.slice(0,2) + "…" + "@" + domain;
+  };
+  const digitsOnly = (s) => String(s||"").replace(/\D/g,"");
+  const setPill = (el, cls, txt) => { el.className = "pill" + (cls ? " " + cls : ""); el.textContent = txt; };
+  const show = (el) => el.style.display = "";
+  const hide = (el) => el.style.display = "none";
+  const banner = (kind, msg) => {
+    const b = $("banner");
+    if(!msg) { hide(b); b.textContent=""; b.className="banner"; return; }
+    b.className = "banner " + kind;
+    b.textContent = msg;
+    show(b);
+  };
+
+  // Toast (fixed, survives sheet collapse)
+  // Result overlay (persistent; hides candidate list until dismissed)
+  let overlayVisible = false;
+  let resultsWereVisible = false;
+
+  const haptics = {
+    good: () => { try { if(navigator.vibrate) navigator.vibrate([20]); } catch(_e) {} },
+    warn: () => { try { if(navigator.vibrate) navigator.vibrate([20,30,20]); } catch(_e) {} },
+    bad:  () => { try { if(navigator.vibrate) navigator.vibrate([50,30,50]); } catch(_e) {} },
+  };
+
+  const hideResultsForOverlay = () => {
+    resultsWereVisible = (resultsScroll && resultsScroll.style.display !== "none");
+    if(resultsScroll) resultsScroll.style.display = "none";
+  };
+  const restoreResultsAfterOverlay = () => {
+    if(resultsWereVisible && lastCandidates && lastCandidates.length) {
+      if(resultsScroll) resultsScroll.style.display = "";
+    }
+    resultsWereVisible = false;
+  };
+
+  const showOverlay = (kind, title, msg, actions=[]) => {
+    const ov = $("resultOverlay");
+    const ovTitle = $("ovTitle");
+    const ovMsg = $("ovMsg");
+    const ovActions = $("ovActions");
+    if(!ov || !ovTitle || !ovMsg || !ovActions) return;
+
+    hideResultsForOverlay();
+
+    ov.className = "resultOverlay " + (kind || "");
+    ovTitle.textContent = title || "Result";
+    ovMsg.textContent = msg || "";
+    ovActions.innerHTML = "";
+
+    for(const a of actions) {
+      const b = document.createElement("button");
+      b.textContent = a.text || "OK";
+      b.className = a.cls || "primary";
+      b.addEventListener("click", () => {
+        try { a.onClick && a.onClick(); } finally {}
+      });
+      ovActions.appendChild(b);
+    }
+
+    ov.style.display = "";
+    overlayVisible = true;
+    (haptics[kind] || (()=>{}))();
+  };
+
+  const hideOverlay = () => {
+    const ov = $("resultOverlay");
+    if(!ov) return;
+    ov.style.display = "none";
+    overlayVisible = false;
+    restoreResultsAfterOverlay();
+  };
+// ==== Elements ====
+  const authPill = $("authPill");
+  const modePill = $("modePill");
+  const eventPill = $("eventPill");
+  const manualHoldBtn = $("manualHold");
+  const holdBar = $("holdBar");
+  const signOutBtn = $("signOutBtn");
+
+  const qInput = $("q");
+  const searchStatus = $("searchStatus");
+  const resultsEl = $("results");
+  const resultsScroll = $("resultsScroll");
+  const resultsMeta = $("resultsMeta");
+  const resultsCount = $("resultsCount");
+  const debugDetails = $("debugDetails");
+  const debugOut = $("debugOut");
+  const toggleDebug = $("toggleDebug");
+
+  // Scanner shell elements
+  const scanPayload = $("scanPayload");
+  const processScanBtn = $("processScanBtn");
+  const clearScanBtn = $("clearScanBtn");
+  const goManualBtn = $("goManualBtn");
+
+  const scanToggleDebug = $("scanToggleDebug");
+  const scanDebugDetails = $("scanDebugDetails");
+  const scanDebugOut = $("scanDebugOut");
+  const copyScanDebug = $("copyScanDebug");
+  const clearScanDebug = $("clearScanDebug");
+
+
+  const selTitle = $("selTitle");
+  const selSub = $("selSub");
+  const modePhone = $("modePhone");
+  const modeEmail = $("modeEmail");
+  const phoneBlock = $("phoneBlock");
+  const emailBlock = $("emailBlock");
+  const phoneLast4 = $("phoneLast4");
+  const emailPrefix = $("emailPrefix");
+  const confirmBtn = $("confirmBtn");
+
+  const verifySheet = $("verifySheet");
+  const sheetToggle = $("sheetToggle");
+  const sheetBodyEl = document.querySelector(".sheetBody");
+
+  const nextGuest = $("nextGuest");
+  const nextGuestTop = $("nextGuestTop");
+  const nextGuestSheet = $("nextGuestSheet");
+
+  // ==== State ====
+  let activeEventId = null;
+  let isManual = false;
+  let mode = "scan"; // "scan" | "manual"
+
+// ==== Offline Pack (IndexedDB) ====
+const OFFLINE_DB_NAME = "voidpass_door_db";
+const OFFLINE_DB_VERSION = 1;
+const OFFLINE_STORE = "offline_packs";
+
+let offlinePack = null; // { event_id, generated_at, count, token_hashes[] }
+
+const offlinePackStatusEl = $("offlinePackStatus");
+const offlinePackDetailsEl = $("offlinePackDetails");
+const downloadOfflinePackBtn = $("downloadOfflinePackBtn");
+const clearOfflinePackBtn = $("clearOfflinePackBtn");
+
+function setOfflinePackUI(state) {
+  // state: { kind: "none"|"ready"|"error"|"checking"|"downloading", ... }
+  if(!offlinePackStatusEl) return;
+  const kind = state?.kind || "none";
+  if(kind === "checking") {
+    offlinePackStatusEl.textContent = "Checking…";
+  } else if(kind === "downloading") {
+    offlinePackStatusEl.textContent = "Downloading…";
+  } else if(kind === "ready") {
+    const c = state.count ?? (offlinePack?.count ?? 0);
+    offlinePackStatusEl.textContent = `Ready ✓ (${c} tokens)`;
+  } else if(kind === "error") {
+    offlinePackStatusEl.textContent = `Error: ${state.message || "unknown"}`;
+  } else {
+    offlinePackStatusEl.textContent = "Not downloaded";
+  }
+
+  if(offlinePackDetailsEl) {
+    const details = state.details || "";
+    if(details) {
+      offlinePackDetailsEl.style.display = "";
+      offlinePackDetailsEl.textContent = details;
+    } else {
+      offlinePackDetailsEl.style.display = "none";
+      offlinePackDetailsEl.textContent = "";
+    }
+  }
+
+  if(downloadOfflinePackBtn) {
+    downloadOfflinePackBtn.disabled = (kind === "downloading" || kind === "checking");
+  }
+  if(clearOfflinePackBtn) {
+    clearOfflinePackBtn.disabled = (kind === "downloading" || kind === "checking" || kind === "none");
+  }
+}
+
+function openOfflineDB() {
+  return new Promise((resolve, reject) => {
+    // Guard: IndexedDB may be unavailable in some privacy modes
+    if(typeof indexedDB === "undefined") {
+      reject(new Error("IndexedDB unavailable"));
+      return;
+    }
+
+    let settled = false;
+    const fail = (err) => {
+      if(settled) return;
+      settled = true;
+      try { clearTimeout(timer); } catch(_e) {}
+      reject(err instanceof Error ? err : new Error(String(err)));
+    };
+    const succeed = (db) => {
+      if(settled) return;
+      settled = true;
+      try { clearTimeout(timer); } catch(_e) {}
+      resolve(db);
+    };
+
+    // If something goes wrong (blocked upgrade, browser oddities), don't hang forever.
+    const timer = setTimeout(() => {
+      fail(new Error("IndexedDB open timed out (possibly blocked by another tab)"));
+    }, 2500);
+
+    try {
+      const req = indexedDB.open(OFFLINE_DB_NAME, OFFLINE_DB_VERSION);
+
+      req.onupgradeneeded = () => {
+        try {
+          const db = req.result;
+          if(!db.objectStoreNames.contains(OFFLINE_STORE)) {
+            db.createObjectStore(OFFLINE_STORE, { keyPath: "event_id" });
+          }
+        } catch(e) {
+          try { req.transaction && req.transaction.abort(); } catch(_e) {}
+          fail(e);
+        }
+      };
+
+      req.onblocked = () => {
+        fail(new Error("IndexedDB upgrade blocked (close other VoidPass Door tabs)"));
+      };
+
+      req.onsuccess = () => {
+        const db = req.result;
+        // If the DB version changes in another tab, close cleanly.
+        try {
+          db.onversionchange = () => { try { db.close(); } catch(_e) {} };
+        } catch(_e) {}
+        succeed(db);
+      };
+
+      req.onerror = () => {
+        fail(req.error || new Error("IndexedDB error"));
+      };
+    } catch(e) {
+      fail(e);
+    }
+  });
+}
+
+
+function withTimeout(promise, ms, message) {
+  let t;
+  const timeout = new Promise((_, reject) => {
+    t = setTimeout(() => reject(new Error(message || `Timed out after ${ms}ms`)), ms);
+  });
+  return Promise.race([
+    promise.finally(() => { try { clearTimeout(t); } catch(_e) {} }),
+    timeout
+  ]);
+}
+
+async function idbGetOfflinePack(eventId) {
+  const db = await openOfflineDB();
+  const op = new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readonly");
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB tx error"));
+
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.get(eventId);
+
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error || new Error("IndexedDB get error"));
+
+    tx.oncomplete = () => { try { db.close(); } catch(_e) {} };
+  });
+  return withTimeout(op, 2500, "IndexedDB read timed out");
+}
+
+async function idbPutOfflinePack(pack) {
+  const db = await openOfflineDB();
+  const op = new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB tx error"));
+
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.put(pack);
+
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error || new Error("IndexedDB put error"));
+
+    tx.oncomplete = () => { try { db.close(); } catch(_e) {} };
+  });
+  return withTimeout(op, 2500, "IndexedDB write timed out");
+}
+
+async function idbDeleteOfflinePack(eventId) {
+  const db = await openOfflineDB();
+  const op = new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    tx.onabort = () => reject(tx.error || new Error("IndexedDB tx aborted"));
+    tx.onerror = () => reject(tx.error || new Error("IndexedDB tx error"));
+
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.delete(eventId);
+
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error || new Error("IndexedDB delete error"));
+
+    tx.oncomplete = () => { try { db.close(); } catch(_e) {} };
+  });
+  return withTimeout(op, 2500, "IndexedDB delete timed out");
+}
+
+async function refreshOfflinePackStatus() {
+  if(!activeEventId) {
+    offlinePack = null;
+    setOfflinePackUI({ kind: "none", details: "No active event." });
+    return;
+  }
+  setOfflinePackUI({ kind: "checking" });
+  try {
+    const local = await idbGetOfflinePack(activeEventId);
+    if(local && local.event_id === activeEventId && Array.isArray(local.token_hashes)) {
+      offlinePack = local;
+      const ts = local.generated_at ? new Date(local.generated_at).toLocaleString() : "";
+      setOfflinePackUI({ kind: "ready", count: local.count ?? local.token_hashes.length, details: ts ? `Downloaded: ${ts}` : "" });
+    } else {
+      offlinePack = null;
+      setOfflinePackUI({ kind: "none" });
+    }
+  } catch(e) {
+    offlinePack = null;
+    setOfflinePackUI({ kind: "error", message: (e?.message || String(e)), details: "IndexedDB not available." });
+  }
+}
+
+async function downloadOfflinePack() {
+  if(!activeEventId) {
+    showOverlay("warn", "No active event", "Cannot download offline pack without an active event.", [
+      { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+    ]);
+    return;
+  }
+  setOfflinePackUI({ kind: "downloading" });
+
+  const attempts = [
+    { fn: "door_get_offline_pack", args: { p_event_id: activeEventId } },
+    { fn: "door_get_offline_pack", args: { event_id: activeEventId } },
+    { fn: "door_get_offline_pack", args: {} },
+  ];
+
+  let lastErr = null;
+  for(const a of attempts) {
+    try {
+      const { data, error } = await sb.rpc(a.fn, a.args);
+      if(error) throw error;
+
+      const pack = data;
+      if(!pack || pack.ok !== true) {
+        const msg = pack?.error || "invalid_response";
+        throw new Error(msg);
+      }
+      const hashes = pack.token_hashes;
+      if(!Array.isArray(hashes)) throw new Error("token_hashes_missing");
+      const stored = {
+        event_id: pack.event_id || activeEventId,
+        generated_at: pack.generated_at || new Date().toISOString(),
+        count: pack.count ?? hashes.length,
+        token_hashes: hashes,
+      };
+      await idbPutOfflinePack(stored);
+      offlinePack = stored;
+      const ts = stored.generated_at ? new Date(stored.generated_at).toLocaleString() : "";
+      setOfflinePackUI({ kind: "ready", count: stored.count, details: ts ? `Downloaded: ${ts}` : "" });
+      return;
+    } catch(e) {
+      lastErr = e;
+    }
+  }
+
+  offlinePack = null;
+  setOfflinePackUI({ kind: "error", message: (lastErr?.message || String(lastErr)) });
+  showOverlay("warn", "Offline pack download failed", (lastErr?.message || "Unknown error"), [
+    { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+  ]);
+}
+
+async function clearOfflinePack() {
+  if(!activeEventId) return;
+  try {
+    await idbDeleteOfflinePack(activeEventId);
+  } catch(_e) {}
+  offlinePack = null;
+  setOfflinePackUI({ kind: "none" });
+}
+
+
+let scanDebugOn = false;
+const scanDebugLog = [];
+const MAX_SCAN_DEBUG = 25;
+
+function renderScanDebug() {
+  if(!scanDebugOut) return;
+  scanDebugOut.textContent = JSON.stringify(scanDebugLog, null, 2);
+}
+
+function pushScanDebug(entry) {
+  scanDebugLog.unshift(entry);
+  if(scanDebugLog.length > MAX_SCAN_DEBUG) scanDebugLog.length = MAX_SCAN_DEBUG;
+  renderScanDebug();
+}
+
+async function copyTextToClipboard(txt) {
+  try {
+    if(navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(txt);
+      return true;
+    }
+  } catch(_e) {}
+  // Fallback: prompt for manual copy
+  try { window.prompt("Copy debug:", txt); } catch(_e) {}
+  return false;
+}
+
+
+  function applyMode() {
+    document.body.classList.toggle("mode-scan", mode === "scan");
+    document.body.classList.toggle("mode-manual", mode === "manual");
+    modePill.textContent = "Mode: " + (mode === "scan" ? "Scanner" : "Manual");
+    // manual input enabled only in manual mode
+    qInput.disabled = (mode !== "manual");
+    if(mode === "manual") {
+      // keep existing manual behavior: focus search
+      setTimeout(() => { try{ qInput.focus(); }catch(_e){} }, 50);
+    }
+  }
+
+  function setMode(newMode) {
+    mode = newMode;
+    applyMode();
+  }
+
+  let debugOn = false;
+  let lastCandidates = [];
+  let selected = null;
+  let verifyMode = "phone"; // phone | email
+
+
+// ==== Sheet state helpers (UX polish) ====
+// Rule A: keep verify panel collapsed until a candidate is selected,
+// and auto-collapse again after successful check-in.
+function setSheetIdle(on) {
+  if(!verifySheet) return;
+  verifySheet.classList.toggle("idle", !!on);
+
+  // Auto-expand behavior: idle always cancels "min"
+  if(on) {
+    sheetMin = false;
+    verifySheet.classList.remove("min");
+    if(sheetToggle) sheetToggle.textContent = "Minimize";
+  }
+}
+
+function clearSelectionOnly() {
+  selected = null;
+  selTitle.textContent = "No guest selected";
+  selSub.textContent = "Select a guest from the list above.";
+  confirmBtn.disabled = true;
+  phoneLast4.value = "";
+  emailPrefix.value = "";
+  banner("", "");
+  setSheetIdle(true);
+}
+
+
+  // ==== Auth ====
+  async function ensureAuth() {
+    const { data } = await sb.auth.getSession();
+    const email = data?.session?.user?.email || null;
+    if(email) {
+      setPill(authPill, "good", "Signed in");
+      authPill.title = email;
+      return true;
+    }
+    setPill(authPill, "bad", "Not signed in");
+    authPill.title = "";
+    return false;
+  }
+
+  async function signOut() {
+    try { await sb.auth.signOut(); } catch(_e) {}
+    location.reload();
+  }
+
+  // ==== Active event ====
+  async function resolveActiveEvent() {
+    try {
+      const { data, error } = await sb.rpc("door_get_active_event_id");
+      if(error) throw error;
+      activeEventId = data || null;
+    } catch (e) {
+      activeEventId = null;
+    }
+    eventPill.textContent = "Event: " + (activeEventId ? activeEventId : "none");
+    return activeEventId;
+  }
+
+  // ==== Manual mode hold toggle ====
+  const HOLD_MS = 800;
+  let holdTimer = null;
+  let holdStart = 0;
+
+  function setManual(on) {
+    isManual = !!on;
+    setMode(isManual ? "manual" : "scan");
+    if(!isManual) {
+      clearAll();
+    }
+  }
+
+  manualHoldBtn.addEventListener("pointerdown", (ev) => {
+    ev.preventDefault();
+    if(mode === "scan") { return; }
+    holdStart = Date.now();
+    holdBar.style.width = "0%";
+    holdTimer = setInterval(() => {
+      const t = Math.min(1, (Date.now()-holdStart)/HOLD_MS);
+      holdBar.style.width = Math.round(t*100) + "%";
+      if(t>=1) {
+        clearInterval(holdTimer);
+        holdTimer = null;
+        holdBar.style.width = "100%";
+        setManual(!isManual);
+        setTimeout(() => { holdBar.style.width = "0%"; }, 150);
+      }
+    }, 16);
+  });
+
+  function cancelHold() {
+    if(holdTimer) {
+      clearInterval(holdTimer);
+      holdTimer = null;
+    }
+    holdBar.style.width = "0%";
+  }
+  manualHoldBtn.addEventListener("pointerup", cancelHold);
+  manualHoldBtn.addEventListener("pointercancel", cancelHold);
+  manualHoldBtn.addEventListener("pointerleave", cancelHold);
+
+  // ==== Debug toggle ====
+  toggleDebug.addEventListener("click", () => {
+    debugOn = !debugOn;
+    debugDetails.style.display = debugOn ? "" : "none";
+  });
+
+
+// ==== Scan debug toggle (visible in scanner mode) ====
+function setScanDebug(on) {
+  scanDebugOn = !!on;
+  if(scanDebugDetails) scanDebugDetails.style.display = scanDebugOn ? "" : "none";
+  if(scanToggleDebug) scanToggleDebug.classList.toggle("on", scanDebugOn);
+  if(scanToggleDebug) scanToggleDebug.textContent = scanDebugOn ? "Debug: On" : "Debug";
+  if(scanDebugOn) renderScanDebug();
+}
+
+if(scanToggleDebug) {
+  scanToggleDebug.addEventListener("click", () => setScanDebug(!scanDebugOn));
+}
+if(copyScanDebug) {
+  copyScanDebug.addEventListener("click", async () => {
+    const txt = JSON.stringify(scanDebugLog, null, 2);
+    await copyTextToClipboard(txt);
+  });
+}
+if(clearScanDebug) {
+  clearScanDebug.addEventListener("click", () => {
+    scanDebugLog.length = 0;
+    renderScanDebug();
+  });
+}
+
+
+  // ==== Scanner shell handlers ====
+  function normalizeScanInput(raw) {
+    const s = String(raw||"").trim();
+    if(!s) return "";
+    // If it's a URL, try to extract something useful.
+    try {
+      if(s.startsWith("http://") || s.startsWith("https://")) {
+        const u = new URL(s);
+        // common patterns: ?q= / ?code= / ?rid=
+        const qp = u.searchParams.get("q") || u.searchParams.get("code") || u.searchParams.get("rid") || "";
+        return (qp || u.pathname.split("/").filter(Boolean).pop() || "").trim();
+      }
+    } catch(_e) {}
+    return s;
+  }
+
+  function routeScanToManual(searchTerm) {
+    setManual(true); // switches to manual mode
+    qInput.value = searchTerm;
+    // trigger search immediately
+    doSearchNow();
+    showOverlay("warn", "Scan received", "Routed to manual search (shell). Select the correct guest and verify.", [
+      { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+    ]);
+  }
+
+
+  async function rpcResolveScanToken(token) {
+    const attempts = [
+      { fn: "door_resolve_scan_token", args: { p_token: token } },
+      { fn: "door_resolve_scan_token", args: { token: token } },
+      { fn: "door_resolve_scan_token", args: { p_scan_token: token } },
+      { fn: "door_resolve_scan_token", args: { scan_token: token } },
+      { fn: "door_resolve_scan_token", args: { value: token } },
+    ];
+    let lastErr = null;
+    for (const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if (error) throw error;
+        // Table-returning RPCs often come back as an array with 0/1 rows.
+        const row = Array.isArray(data) ? (data[0] || null) : data;
+        return { ok: true, row, used: a.args };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    return { ok: false, error: lastErr };
+  }
+
+  async function rpcDoorCheckinAtomic(registrationId, method) {
+    const attempts = [
+      { fn: "door_checkin_atomic", args: { p_registration_id: registrationId, p_method: method } },
+      { fn: "door_checkin_atomic", args: { registration_id: registrationId, method: method } },
+      { fn: "door_checkin_atomic", args: { p_registration_id: registrationId, method: method } },
+      { fn: "door_checkin_atomic", args: { registration_id: registrationId, p_method: method } },
+      { fn: "door_checkin_atomic", args: { p_reg_id: registrationId, p_method: method } },
+      { fn: "door_checkin_atomic", args: { reg_id: registrationId, method: method } },
+    ];
+    let lastErr = null;
+    for (const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if (error) throw error;
+        const row = Array.isArray(data) ? (data[0] || null) : data;
+        return { ok: true, row, used: a.args };
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    return { ok: false, error: lastErr };
+  }
+
+  function haptic(kind) {
+    try {
+      if (!navigator.vibrate) return;
+      if (kind === "good") navigator.vibrate(35);
+      else if (kind === "warn") navigator.vibrate([20, 40, 20]);
+      else if (kind === "bad") navigator.vibrate([60, 30, 60]);
+    } catch (_e) {}
+  }
+
+
+  if(processScanBtn) {
+    processScanBtn.addEventListener("click", async () => {
+      const raw = normalizeScanInput(scanPayload?.value || "");
+
+const trace = {
+  ts: new Date().toISOString(),
+  raw_input: String(scanPayload?.value || ""),
+  normalized_token: raw,
+  resolver: null,
+  checkin: null,
+  outcome: null
+};
+
+      if(!raw) {
+        showOverlay("warn", "No scan payload", "Paste a QR payload first.", [
+          { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+        ]);
+        return;
+      }
+
+      // Prevent double-taps
+      processScanBtn.disabled = true;
+
+      showOverlay("warn", "Processing scan…", "Resolving token with backend.", [
+        { text: "Cancel", cls: "", onClick: () => { processScanBtn.disabled = false; hideOverlay(); } },
+      ]);
+
+      try {
+        // 1) Resolve token -> registration_id (active event enforced server-side)
+        const r = await rpcResolveScanToken(raw);
+        trace.resolver = { ok: r.ok, used: r.used, row: r.row || null, error: r.ok ? null : String(r.error?.message || r.error || "unknown") };
+        if(!r.ok || !r.row) {
+          trace.outcome = { ok:false, code:"resolver_failed" };
+          if(scanDebugOn) pushScanDebug(trace);
+          showOverlay("bad", "Scan failed", "Resolver call failed. Use Manual lookup if needed.", [
+            { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+            { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("bad");
+          return;
+        }
+
+        const row = r.row;
+        if(!row.ok) {
+          const code = row.error || "invalid_token";
+          let msg = "Scan token invalid.";
+          if(code === "no_active_event") msg = "No active event.";
+          else if(code === "token_expired") msg = "Scan token expired.";
+          else if(code === "token_used") msg = "Scan token already used.";
+          else if(code === "invalid_token") msg = "Invalid scan token.";
+
+          trace.outcome = { ok:false, code: code };
+          if(scanDebugOn) pushScanDebug(trace);
+          showOverlay("warn", "Scan not accepted", msg, [
+            { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+            { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("warn");
+          return;
+        }
+
+        const rid = row.registration_id;
+        if(!rid) {
+          trace.outcome = { ok:false, code:"missing_registration_id" };
+          if(scanDebugOn) pushScanDebug(trace);
+          showOverlay("bad", "Scan failed", "Resolved token did not return a registration id.", [
+            { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("bad");
+          return;
+        }
+
+        // 2) Atomic check-in
+        const c = await rpcDoorCheckinAtomic(rid, "scan");
+        trace.checkin = { ok: c.ok, used: c.used, row: c.row || null, error: c.ok ? null : String(c.error?.message || c.error || "unknown") };
+        if(!c.ok || !c.row) {
+          trace.outcome = { ok:false, code:"checkin_call_failed" };
+          if(scanDebugOn) pushScanDebug(trace);
+          showOverlay("bad", "Check-in failed", "door_checkin_atomic call failed.", [
+            { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+          ]);
+          haptic("bad");
+          return;
+        }
+
+        const crow = c.row;
+        if(crow.ok) {
+          trace.outcome = { ok:true, code:"checked_in" };
+          if(scanDebugOn) pushScanDebug(trace);
+          haptic("good");
+          showOverlay("good", "Checked in", "Scan check-in successful.", [
+            { text: "Next guest", cls: "good", onClick: () => {
+                hideOverlay();
+                processScanBtn.disabled = false;
+                if(scanPayload) scanPayload.value = "";
+                try { scanPayload.focus(); } catch(_e) {}
+              } 
+            },
+            { text: "Close", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          ]);
+          return;
+        }
+
+        // Expected error codes
+        const err = crow.error || "not_verified";
+        if(err === "already_checked_in") {
+          trace.outcome = { ok:false, code:"already_checked_in", checked_in_at: crow.checked_in_at || null };
+          if(scanDebugOn) pushScanDebug(trace);
+          const at = crow.checked_in_at ? (" at " + String(crow.checked_in_at).replace("T"," ").replace("Z","")) : "";
+          haptic("warn");
+          showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
+            { text: "Next guest", cls: "good", onClick: () => {
+                hideOverlay();
+                processScanBtn.disabled = false;
+                if(scanPayload) scanPayload.value = "";
+                try { scanPayload.focus(); } catch(_e) {}
+              } 
+            },
+            { text: "Close", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          ]);
+          return;
+        }
+
+        trace.outcome = { ok:false, code: err };
+        if(scanDebugOn) pushScanDebug(trace);
+        haptic("warn");
+        showOverlay("warn", "Not checked in", (err ? (err + ".") : "Not verified."), [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+        ]);
+      } catch (e) {
+        trace.outcome = { ok:false, code:"exception", message: String(e?.message || e) };
+        if(scanDebugOn) pushScanDebug(trace);
+        haptic("bad");
+        showOverlay("bad", "Scan error", String(e?.message || e), [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
+          { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
+        ]);
+      } finally {
+        // If overlay is still up, button state is controlled by overlay actions.
+        // Ensure it isn't stuck disabled if something unexpected happened.
+        // (Overlay Cancel/Try again/Close also re-enables.)
+      }
+    });
+  }
+
+  if(clearScanBtn) {
+    clearScanBtn.addEventListener("click", () => {
+      if(scanPayload) scanPayload.value = "";
+      try { scanPayload.focus(); } catch(_e) {}
+    });
+  }
+
+  if(goManualBtn) {
+    goManualBtn.addEventListener("click", () => {
+      setManual(true);
+    });
+  }
+
+
+  // ==== Offline pack controls ====
+  if(downloadOfflinePackBtn) {
+    downloadOfflinePackBtn.addEventListener("click", async () => {
+      await downloadOfflinePack();
+    });
+  }
+  if(clearOfflinePackBtn) {
+    clearOfflinePackBtn.addEventListener("click", async () => {
+      await clearOfflinePack();
+    });
+  }
+
+  // ==== Sheet minimize toggle (now functional) ====
+  let sheetMin = false;
+  if(sheetToggle && verifySheet){
+    sheetToggle.addEventListener("click", () => {
+      sheetMin = !sheetMin;
+      verifySheet.classList.toggle("min", sheetMin);
+      sheetToggle.textContent = sheetMin ? "Expand" : "Minimize";
+    });
+  }
+
+  
+  // Unified collapse control: collapsed when no guest selected / after success
+  const setVerifyPanelCollapsed = (collapsed) => {
+    if(!verifySheet || !sheetBodyEl) return;
+    verifySheet.classList.toggle("min", !!collapsed);
+    sheetBodyEl.style.display = collapsed ? "none" : "";
+    sheetMin = !!collapsed;
+    if(sheetToggle) sheetToggle.textContent = collapsed ? "Expand" : "Minimize";
+  };
+
+// ==== Verify mode toggle ====
+  function setVerifyMode(mode) {
+    verifyMode = mode;
+    modePhone.classList.toggle("on", verifyMode==="phone");
+    modeEmail.classList.toggle("on", verifyMode==="email");
+    phoneBlock.style.display = verifyMode==="phone" ? "" : "none";
+    emailBlock.style.display = verifyMode==="email" ? "" : "none";
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    banner("", "");
+  }
+  modePhone.addEventListener("click", () => setVerifyMode("phone"));
+  modeEmail.addEventListener("click", () => setVerifyMode("email"));
+
+  // ==== Candidate rendering ====
+  function candidateHasPhone(c) {
+    return !!(c.phone_e164 || c.phone || c.phone_present || c.has_phone || c.phonePresent);
+  }
+  function getEntriesRemaining(c) {
+    const rem = c.entries_remaining ?? c.remaining ?? c.entriesRemaining ?? null;
+    return rem === null || rem === undefined ? null : Number(rem);
+  }
+  function getLastCheckin(c) {
+    return c.last_checkin_at ?? c.lastCheckinAt ?? null;
+  }
+
+  function fmtTs(ts) {
+    if(!ts) return "";
+    return String(ts).replace('T',' ').replace('Z','');
+  }
+
+  function viewCheckedIn(c) {
+    const name = c.full_name || c.name || "(no name)";
+    const last = getLastCheckin(c);
+    const at = last ? (" at " + fmtTs(last)) : "";
+    showOverlay("warn", "Already checked in", name + " was already checked in" + at + ".", [
+      { text:"Close", cls:"primary", onClick: () => { hideOverlay(); } },
+      { text:"Next guest", cls:"good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } },
+    ]);
+  }
+
+  function renderCandidates(arr) {
+    lastCandidates = Array.isArray(arr) ? arr : [];
+    resultsEl.innerHTML = "";
+    if(!lastCandidates.length) {
+      resultsMeta.textContent = "No matches.";
+      resultsCount.textContent = "";
+      hide(resultsScroll);
+      return;
+    }
+    resultsMeta.textContent = "Matches";
+    resultsCount.textContent = String(lastCandidates.length);
+    show(resultsScroll);
+
+    for(const c of lastCandidates) {
+      const name = c.full_name || c.name || "(no name)";
+      const email = c.email || c.guest_email || c.masked_email || "";
+      const id = c.registration_id || c.id || "";
+      const rem = getEntriesRemaining(c);
+      const last = getLastCheckin(c);
+      const hasPhone = candidateHasPhone(c);
+      const isChecked = (rem !== null && rem <= 0);
+
+      const row = document.createElement("div");
+      row.className = "cand" + (isChecked ? " checked" : "");
+
+      const left = document.createElement("div");
+      left.className = "left";
+
+      if(isChecked) {
+        left.innerHTML = `
+          <div class="name">${esc(name)}</div>
+          <div class="meta">
+            <span class="tag warn">ALREADY CHECKED IN</span>
+            ${last ? '<span class="tag">at ' + esc(fmtTs(last)) + '</span>' : ''}
+            <span class="tag">${esc(maskEmail(email))}</span>
+            ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
+          </div>
+        `;
+      } else {
+        left.innerHTML = `
+          <div class="name">${esc(name)}</div>
+          <div class="meta">
+            <span class="tag">${esc(maskEmail(email))}</span>
+            ${hasPhone ? '<span class="tag">📱 on file</span>' : '<span class="tag warn">no phone</span>'}
+            ${(rem !== null) ? '<span class="tag">entries: ' + esc(rem) + '</span>' : ''}
+          </div>
+        `;
+      }
+
+      const right = document.createElement("div");
+      right.className = "right";
+      const btn = document.createElement("button");
+      btn.textContent = isChecked ? "View only" : "Select";
+      btn.className = isChecked ? "viewOnly" : "primary";
+      btn.addEventListener("click", () => isChecked ? viewCheckedIn(c) : selectCandidate(c));
+      right.appendChild(btn);
+
+      row.appendChild(left);
+      row.appendChild(right);
+      resultsEl.appendChild(row);
+    }
+  }
+
+  function selectCandidate(c) {
+    selected = c;
+    setVerifyPanelCollapsed(false);
+    // Auto-expand verify panel when a candidate is selected
+    setSheetIdle(false);
+    sheetMin = false;
+    verifySheet.classList.remove("min");
+    if(sheetToggle) sheetToggle.textContent = "Minimize";
+    const name = c.full_name || c.name || "(no name)";
+    const email = c.email || c.guest_email || c.masked_email || "";
+    const id = c.registration_id || c.id || "";
+    const rem = getEntriesRemaining(c);
+    const last = getLastCheckin(c);
+    const hasPhone = candidateHasPhone(c);
+
+    selTitle.textContent = name;
+    let sub = id + " • " + (email ? maskEmail(email) : "no email");
+    if(rem !== null && rem <= 0) sub += " • ALREADY CHECKED IN" + (last ? (" • " + String(last).replace('T',' ').replace('Z','')) : "");
+    selSub.textContent = sub;
+
+    if(rem !== null && rem <= 0) {
+      confirmBtn.disabled = true;
+      banner("warn", "Already checked in. Do not re-check-in.");
+    } else {
+      confirmBtn.disabled = false;
+      banner("", "");
+    }
+
+    if(hasPhone) {
+      setVerifyMode("phone");
+      setVerifyPanelCollapsed(false);
+    } else {
+      setVerifyMode("email");
+      banner("warn", "No phone on file for this guest. Use email prefix.");
+    }
+
+    setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 60);
+  }
+
+  // ==== Live search (debounced) ====
+  let searchTimer = null;
+  const DEBOUNCE_MS = 220;
+
+  async function rpcSearchCandidates(eventId, q) {
+    const attempts = [
+      { fn:"door_search_candidates", args: { p_event_id: eventId, p_query: q } },
+      { fn:"door_search_candidates", args: { event_id: eventId, query: q } },
+      { fn:"door_search_candidates", args: { p_event_id: eventId, q: q } },
+      { fn:"door_search_candidates", args: { p_query: q } },
+      { fn:"door_search_candidates", args: { query: q } },
+      { fn:"door_search_candidates", args: { q: q } },
+    ];
+    let lastErr = null;
+    for(const a of attempts) {
+      try {
+        const { data, error } = await sb.rpc(a.fn, a.args);
+        if(error) throw error;
+        return { ok:true, data, used:a.args };
+      } catch(e) {
+        lastErr = e;
+      }
+    }
+    return { ok:false, error:lastErr };
+  }
+
+  async function doSearchNow() {
+    const q = qInput.value.trim();
+    if(!isManual) return;
+
+    if(q.length < 2) {
+      resultsMeta.textContent = "Type 2+ chars.";
+      resultsCount.textContent = "";
+      resultsEl.innerHTML = "";
+      hide(resultsScroll);
+      hide(searchStatus);
+      return;
+    }
+
+    show(searchStatus);
+    searchStatus.textContent = "Searching…";
+    await resolveActiveEvent();
+
+    const res = await rpcSearchCandidates(activeEventId, q);
+    if(!res.ok) {
+      searchStatus.textContent = "Search failed.";
+      banner("bad", "Search failed. (Check RPC permissions / active event.)");
+      debugOut.textContent = JSON.stringify({ ok:false, error: String(res.error?.message || res.error || "unknown") }, null, 2);
+      renderCandidates([]);
+      return;
+    }
+
+    const raw = res.data;
+    const normalized = (raw && typeof raw === "object" && !Array.isArray(raw) && Array.isArray(raw.candidates)) ? raw.candidates : raw;
+    const arr = Array.isArray(normalized) ? normalized : [];
+
+    hide(searchStatus);
+
+    debugOut.textContent = JSON.stringify({ ok:true, used: res.used, count: arr.length, raw: raw }, null, 2);
+    renderCandidates(arr);
+  }
+
+  qInput.addEventListener("input", () => {
+    if(searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(doSearchNow, DEBOUNCE_MS);
+  });
+
+  // ==== Confirm check-in (via edge) ====
+  async function doConfirm() {
+    if(!selected) {
+      showOverlay("warn", "Select a guest", "Select a guest from the list above.", [
+        { text: "OK", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
+      return;
+    }
+
+    const rem = getEntriesRemaining(selected);
+    if(rem !== null && rem <= 0) {
+      const at = (getLastCheckin(selected) ? (" at " + String(getLastCheckin(selected)).replace('T',' ').replace('Z','')) : "");
+      showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
+        { text: "Next guest", cls: "good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } },
+        { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
+      return;
+    }
+
+    const rid = selected.registration_id || selected.id;
+    if(!rid) {
+      showOverlay("bad", "Missing ID", "This record is missing a registration id. Try searching again.", [
+        { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
+      return;
+    }
+
+    const usePhone = verifyMode === "phone";
+    let last4 = digitsOnly(phoneLast4.value).slice(-4);
+    if(phoneLast4.value !== last4) phoneLast4.value = last4;
+
+    let ep = (emailPrefix.value || "").trim().toLowerCase();
+    ep = ep.replace(/[^a-z0-9]+$/g, "");
+    if(emailPrefix.value !== ep) emailPrefix.value = ep;
+
+    if(usePhone) {
+      if(last4.length < 3) {
+        showOverlay("warn", "Need phone digits", "Enter the guest's phone last 4 digits.", [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); setTimeout(() => phoneLast4.focus(), 50); } },
+        ]);
+        return;
+      }
+    } else {
+      if(ep.length < 2) {
+        showOverlay("warn", "Need email prefix", "Enter the first part of the guest's email (before @).", [
+          { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); setTimeout(() => emailPrefix.focus(), 50); } },
+        ]);
+        return;
+      }
+    }
+
+    confirmBtn.disabled = true;
+    banner("", "");
+
+    const { data: sess } = await sb.auth.getSession();
+    const token = sess?.session?.access_token || "";
+
+    const payload = {
+      action: "confirm_candidate",
+      event_id: activeEventId,
+      registration_id: rid,
+      method: usePhone ? "phone_last4" : "email_prefix",
+      phone_last4: usePhone ? last4 : null,
+      email_prefix: usePhone ? null : ep
+    };
+
+    let json = null;
+    try {
+      const resp = await fetch(SUPABASE_URL + "/functions/v1/door_checkin", {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization": token ? ("Bearer " + token) : ""
+        },
+        body: JSON.stringify(payload)
+      });
+
+      json = await resp.json().catch(() => ({ ok:false, code:"bad_json" }));
+
+      if(resp.ok && json.ok) {
+        // Refresh list in background (if still open later)
+        await doSearchNow();
+
+        // Collapse verify panel to quiet state
+        setVerifyPanelCollapsed(true);
+
+        showOverlay("good", "Checked in", "Check-in recorded successfully.", [
+          { text: "Next guest", cls: "good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } }
+        ]);
+      } else {
+        // Map known errors to clearer copy
+        if(json?.code === "already_checked_in") {
+          const at = json.checked_in_at ? (" at " + String(json.checked_in_at).replace('T',' ').replace('Z','')) : "";
+          showOverlay("warn", "Already checked in", "This guest is already checked in" + at + ".", [
+            { text: "Next guest", cls: "good", onClick: () => { hideOverlay(); clearAll(); if(isManual) qInput.focus(); } },
+            { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+          ]);
+        } else if(json?.code === "not_verified") {
+          showOverlay("warn", "Not verified", "Details didn't match. Try again.", [
+            { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); setTimeout(() => (usePhone ? phoneLast4.focus() : emailPrefix.focus()), 50); } },
+          ]);
+        } else if(json?.code === "email_prefix_required") {
+          showOverlay("warn", "Email required", "This guest has no phone on file. Use email prefix.", [
+            { text: "Use email", cls: "primary", onClick: () => { hideOverlay(); setVerifyMode("email"); setTimeout(() => emailPrefix.focus(), 50); } },
+          ]);
+        } else if(json?.code === "phone_last4_required") {
+          showOverlay("warn", "Phone required", "This guest has a phone on file. Use phone last 4.", [
+            { text: "Use phone", cls: "primary", onClick: () => { hideOverlay(); setVerifyMode("phone"); setTimeout(() => phoneLast4.focus(), 50); } },
+          ]);
+        } else if(json?.code === "no_active_event") {
+          showOverlay("bad", "No active event", "There is no active event right now.", [
+            { text: "OK", cls: "primary", onClick: () => { hideOverlay(); } },
+          ]);
+        } else {
+          const code = json?.code ? String(json.code) : "unknown_error";
+          showOverlay("bad", "Check-in failed", "Could not check in (" + code + ").", [
+            { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+          ]);
+        }
+      }
+
+      debugOut.textContent = JSON.stringify({ edge_response: json, payload_sent: payload }, null, 2);
+    } catch (e) {
+      showOverlay("bad", "Network error", "Couldn't reach the server. Try again.", [
+        { text: "Back", cls: "primary", onClick: () => { hideOverlay(); } },
+      ]);
+      debugOut.textContent = JSON.stringify({ ok:false, error: String(e?.message || e) }, null, 2);
+    } finally {
+      confirmBtn.disabled = false;
+    }
+  }
+
+  confirmBtn.addEventListener("click", doConfirm);
+
+  // ==== Clear / Next guest ====
+  function clearAll() {
+    qInput.value = "";
+    resultsEl.innerHTML = "";
+    lastCandidates = [];
+    resultsMeta.textContent = "No search yet.";
+    resultsCount.textContent = "";
+    hide(resultsScroll);
+    hide(searchStatus);
+
+    selected = null;
+    selTitle.textContent = "No guest selected";
+    selSub.textContent = "Select a guest from the list above.";
+    confirmBtn.disabled = true;
+    setVerifyPanelCollapsed(true);
+
+    phoneLast4.value = "";
+    emailPrefix.value = "";
+    banner("", "");
+    debugOut.textContent = "{}";
+    setSheetIdle(true);
+  }
+
+  nextGuestSheet && nextGuestSheet.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
+
+  nextGuest.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
+  nextGuestTop.addEventListener("click", () => {
+    clearAll();
+    if(isManual) qInput.focus();
+  });
+
+  // ==== Init ====
+  signOutBtn.addEventListener("click", signOut);
+
+  (async () => {
+    await ensureAuth();
+    await resolveActiveEvent();
+    await refreshOfflinePackStatus();
+    setManual(false);
+    setMode("scan");
+    applyMode();
+    setVerifyMode("phone");
+    setSheetIdle(true);
+    setScanDebug(false);
+  })();
+
+})();
+
+</script>
+</body>
+</html>
