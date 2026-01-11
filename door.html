@@ -341,7 +341,7 @@
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v11.3</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.0 (offline pack panel)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -371,7 +371,22 @@
             </div>
           </div>
 
-          <div class="sep"></div>
+          
+          <div class="card" id="offlinePackCard" style="margin-top:12px;">
+            <div class="row" style="justify-content:space-between; gap:10px; align-items:flex-start;">
+              <div style="min-width:0;">
+                <div style="font-weight:800;">Offline pack</div>
+                <div class="muted" id="offlinePackStatus">Checking…</div>
+                <div class="muted" id="offlinePackDetails" style="margin-top:6px; display:none;"></div>
+              </div>
+              <div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+                <button id="downloadOfflinePackBtn" class="primary">Download</button>
+                <button id="clearOfflinePackBtn">Clear</button>
+              </div>
+            </div>
+          </div>
+
+<div class="sep"></div>
 
           <label for="scanPayload">Scan payload</label>
           <input id="scanPayload" type="text" placeholder="Paste QR payload here…" autocomplete="off" inputmode="text" />
@@ -629,6 +644,191 @@
   let activeEventId = null;
   let isManual = false;
   let mode = "scan"; // "scan" | "manual"
+
+// ==== Offline Pack (IndexedDB) ====
+const OFFLINE_DB_NAME = "voidpass_door_db";
+const OFFLINE_DB_VERSION = 1;
+const OFFLINE_STORE = "offline_packs";
+
+let offlinePack = null; // { event_id, generated_at, count, token_hashes[] }
+
+const offlinePackStatusEl = $("offlinePackStatus");
+const offlinePackDetailsEl = $("offlinePackDetails");
+const downloadOfflinePackBtn = $("downloadOfflinePackBtn");
+const clearOfflinePackBtn = $("clearOfflinePackBtn");
+
+function setOfflinePackUI(state) {
+  // state: { kind: "none"|"ready"|"error"|"checking"|"downloading", ... }
+  if(!offlinePackStatusEl) return;
+  const kind = state?.kind || "none";
+  if(kind === "checking") {
+    offlinePackStatusEl.textContent = "Checking…";
+  } else if(kind === "downloading") {
+    offlinePackStatusEl.textContent = "Downloading…";
+  } else if(kind === "ready") {
+    const c = state.count ?? (offlinePack?.count ?? 0);
+    offlinePackStatusEl.textContent = `Ready ✓ (${c} tokens)`;
+  } else if(kind === "error") {
+    offlinePackStatusEl.textContent = `Error: ${state.message || "unknown"}`;
+  } else {
+    offlinePackStatusEl.textContent = "Not downloaded";
+  }
+
+  if(offlinePackDetailsEl) {
+    const details = state.details || "";
+    if(details) {
+      offlinePackDetailsEl.style.display = "";
+      offlinePackDetailsEl.textContent = details;
+    } else {
+      offlinePackDetailsEl.style.display = "none";
+      offlinePackDetailsEl.textContent = "";
+    }
+  }
+
+  if(downloadOfflinePackBtn) {
+    downloadOfflinePackBtn.disabled = (kind === "downloading" || kind === "checking");
+  }
+  if(clearOfflinePackBtn) {
+    clearOfflinePackBtn.disabled = (kind === "downloading" || kind === "checking" || kind === "none");
+  }
+}
+
+function openOfflineDB() {
+  return new Promise((resolve, reject) => {
+    try {
+      const req = indexedDB.open(OFFLINE_DB_NAME, OFFLINE_DB_VERSION);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if(!db.objectStoreNames.contains(OFFLINE_STORE)) {
+          db.createObjectStore(OFFLINE_STORE, { keyPath: "event_id" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    } catch(e) {
+      reject(e);
+    }
+  });
+}
+
+async function idbGetOfflinePack(eventId) {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readonly");
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.get(eventId);
+    req.onsuccess = () => resolve(req.result || null);
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => db.close();
+  });
+}
+
+async function idbPutOfflinePack(pack) {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.put(pack);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => db.close();
+  });
+}
+
+async function idbDeleteOfflinePack(eventId) {
+  const db = await openOfflineDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(OFFLINE_STORE, "readwrite");
+    const store = tx.objectStore(OFFLINE_STORE);
+    const req = store.delete(eventId);
+    req.onsuccess = () => resolve(true);
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => db.close();
+  });
+}
+
+async function refreshOfflinePackStatus() {
+  if(!activeEventId) {
+    offlinePack = null;
+    setOfflinePackUI({ kind: "none", details: "No active event." });
+    return;
+  }
+  setOfflinePackUI({ kind: "checking" });
+  try {
+    const local = await idbGetOfflinePack(activeEventId);
+    if(local && local.event_id === activeEventId && Array.isArray(local.token_hashes)) {
+      offlinePack = local;
+      const ts = local.generated_at ? new Date(local.generated_at).toLocaleString() : "";
+      setOfflinePackUI({ kind: "ready", count: local.count ?? local.token_hashes.length, details: ts ? `Downloaded: ${ts}` : "" });
+    } else {
+      offlinePack = null;
+      setOfflinePackUI({ kind: "none" });
+    }
+  } catch(e) {
+    offlinePack = null;
+    setOfflinePackUI({ kind: "error", message: (e?.message || String(e)), details: "IndexedDB not available." });
+  }
+}
+
+async function downloadOfflinePack() {
+  if(!activeEventId) {
+    showOverlay("warn", "No active event", "Cannot download offline pack without an active event.", [
+      { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+    ]);
+    return;
+  }
+  setOfflinePackUI({ kind: "downloading" });
+
+  const attempts = [
+    { fn: "door_get_offline_pack", args: { p_event_id: activeEventId } },
+    { fn: "door_get_offline_pack", args: { event_id: activeEventId } },
+    { fn: "door_get_offline_pack", args: {} },
+  ];
+
+  let lastErr = null;
+  for(const a of attempts) {
+    try {
+      const { data, error } = await sb.rpc(a.fn, a.args);
+      if(error) throw error;
+
+      const pack = data;
+      if(!pack || pack.ok !== true) {
+        const msg = pack?.error || "invalid_response";
+        throw new Error(msg);
+      }
+      const hashes = pack.token_hashes;
+      if(!Array.isArray(hashes)) throw new Error("token_hashes_missing");
+      const stored = {
+        event_id: pack.event_id || activeEventId,
+        generated_at: pack.generated_at || new Date().toISOString(),
+        count: pack.count ?? hashes.length,
+        token_hashes: hashes,
+      };
+      await idbPutOfflinePack(stored);
+      offlinePack = stored;
+      const ts = stored.generated_at ? new Date(stored.generated_at).toLocaleString() : "";
+      setOfflinePackUI({ kind: "ready", count: stored.count, details: ts ? `Downloaded: ${ts}` : "" });
+      return;
+    } catch(e) {
+      lastErr = e;
+    }
+  }
+
+  offlinePack = null;
+  setOfflinePackUI({ kind: "error", message: (lastErr?.message || String(lastErr)) });
+  showOverlay("warn", "Offline pack download failed", (lastErr?.message || "Unknown error"), [
+    { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+  ]);
+}
+
+async function clearOfflinePack() {
+  if(!activeEventId) return;
+  try {
+    await idbDeleteOfflinePack(activeEventId);
+  } catch(_e) {}
+  offlinePack = null;
+  setOfflinePackUI({ kind: "none" });
+}
 
 
 let scanDebugOn = false;
@@ -1058,6 +1258,19 @@ const trace = {
     });
   }
 
+
+  // ==== Offline pack controls ====
+  if(downloadOfflinePackBtn) {
+    downloadOfflinePackBtn.addEventListener("click", async () => {
+      await downloadOfflinePack();
+    });
+  }
+  if(clearOfflinePackBtn) {
+    clearOfflinePackBtn.addEventListener("click", async () => {
+      await clearOfflinePack();
+    });
+  }
+
   // ==== Sheet minimize toggle (now functional) ====
   let sheetMin = false;
   if(sheetToggle && verifySheet){
@@ -1467,6 +1680,7 @@ const trace = {
   (async () => {
     await ensureAuth();
     await resolveActiveEvent();
+    await refreshOfflinePackStatus();
     setManual(false);
     setMode("scan");
     applyMode();
