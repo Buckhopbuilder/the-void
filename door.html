@@ -1377,7 +1377,7 @@ const trace = {
         }
 
         // 2) Atomic check-in
-        const c = await rpcDoorCheckinAtomic(rid, "scan");
+        const c = await rpcDoorCheckinAtomic(rid, "qr");
         trace.checkin = { ok: c.ok, used: c.used, row: c.row || null, error: c.ok ? null : String(c.error?.message || c.error || "unknown") };
         if(!c.ok || !c.row) {
           trace.outcome = { ok:false, code:"checkin_call_failed" };
