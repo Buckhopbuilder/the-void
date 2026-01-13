@@ -404,6 +404,9 @@ window.__BUILD = "v12.5";
             <button id="clearScanBtn">Clear</button>
           </div>
 
+          <div id="scanStatus" class="muted" style="margin-top:8px; min-height:18px;"></div>
+
+
           <div class="tiny" style="margin-top:10px; opacity:.8;">
             Scan resolves the token via backend then performs an atomic check-in. Manual fallback remains available.
           </div>
@@ -943,6 +946,17 @@ function pushScanDebug(entry) {
   renderScanDebug();
 }
 
+
+
+function setScanStatus(kind, msg) {
+  try {
+    const el = document.getElementById("scanStatus");
+    if(!el) return;
+    const prefix = kind === "good" ? "✅ " : kind === "warn" ? "⚠️ " : kind === "bad" ? "⛔ " : "";
+    el.textContent = prefix + (msg || "");
+  } catch(_e) {}
+}
+
 async function copyTextToClipboard(txt) {
   try {
     if(navigator.clipboard && navigator.clipboard.writeText) {
@@ -1313,6 +1327,7 @@ const trace = {
 
       // Prevent double-taps
       processScanBtn.disabled = true;
+      setScanStatus("warn","Processing scan…");
 
       // Trace that the click handler actually fired (helps diagnose "nothing happened")
       trace.outcome = { stage: "clicked", overlayVisible: typeof overlayVisible !== "undefined" ? overlayVisible : null };
@@ -1338,6 +1353,7 @@ const trace = {
         if(!r.ok || !r.row) {
           trace.outcome = { ok:false, code:"resolver_failed" };
           if(scanDebugOn) pushScanDebug(trace);
+          setScanStatus("bad","Scan failed: resolver_failed");
           showOverlay("bad", "Scan failed", "Resolver call failed. Use Manual lookup if needed.", [
             { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
             { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
@@ -1357,6 +1373,7 @@ const trace = {
 
           trace.outcome = { ok:false, code: code };
           if(scanDebugOn) pushScanDebug(trace);
+          setScanStatus("warn","Scan not accepted: " + code);
           showOverlay("warn", "Scan not accepted", msg, [
             { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
             { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
@@ -1369,6 +1386,7 @@ const trace = {
         if(!rid) {
           trace.outcome = { ok:false, code:"missing_registration_id" };
           if(scanDebugOn) pushScanDebug(trace);
+          setScanStatus("bad","Scan failed: missing_registration_id");
           showOverlay("bad", "Scan failed", "Resolved token did not return a registration id.", [
             { text: "Manual lookup", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
           ]);
@@ -1394,6 +1412,7 @@ const trace = {
           trace.outcome = { ok:true, code:"checked_in" };
           if(scanDebugOn) pushScanDebug(trace);
           haptic("good");
+          setScanStatus("good","Checked in");
           let successMsg = "Scan check-in successful.";
           try {
             const d = await rpcDoorGetDisplayHint(rid);
@@ -1419,7 +1438,7 @@ const trace = {
         }
 
         // Expected error codes
-        const err = crow.error || "not_verified";
+        const err = crow.error || crow.code || "not_verified";
         if(err === "already_checked_in") {
           trace.outcome = { ok:false, code:"already_checked_in", checked_in_at: crow.checked_in_at || null };
           if(scanDebugOn) pushScanDebug(trace);
@@ -1441,6 +1460,7 @@ const trace = {
         trace.outcome = { ok:false, code: err };
         if(scanDebugOn) pushScanDebug(trace);
         haptic("warn");
+        setScanStatus("warn","Not checked in: " + err);
         showOverlay("warn", "Not checked in", (err ? (err + ".") : "Not verified."), [
           { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
           { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
@@ -1449,6 +1469,7 @@ const trace = {
         trace.outcome = { ok:false, code:"exception", message: String(e?.message || e) };
         if(scanDebugOn) pushScanDebug(trace);
         haptic("bad");
+        setScanStatus("bad","Scan error: " + String(e?.message || e));
         showOverlay("bad", "Scan error", String(e?.message || e), [
           { text: "Try again", cls: "primary", onClick: () => { hideOverlay(); processScanBtn.disabled = false; } },
           { text: "Manual lookup", cls: "", onClick: () => { hideOverlay(); processScanBtn.disabled = false; routeScanToManual(raw); } },
