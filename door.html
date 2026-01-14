@@ -1382,7 +1382,7 @@ const trace = {
           return;
         }
 
-        const rid = row.registration_id;
+        const rid = row.registration_id || row.reg_id;
         if(!rid) {
           trace.outcome = { ok:false, code:"missing_registration_id" };
           if(scanDebugOn) pushScanDebug(trace);
