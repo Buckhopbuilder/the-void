@@ -361,7 +361,7 @@ window.__BUILD = "v12.5";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.7.1 (offline pack + sign-in fix)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.7.2 (offline pack + sign-in fix)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -563,6 +563,11 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 // ==== Helpers ====
   const $ = (id) => document.getElementById(id);
+
+  // Safe sessionStorage helpers (some privacy modes can throw on access)
+  const ssGet = (k) => { try { return ssGet(k); } catch (e) { return null; } };
+  const ssSet = (k, v) => { try { ssSet(k, v); } catch (e) {} };
+
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
   const maskEmail = (email) => {
     const e = String(email||"");
@@ -1305,7 +1310,7 @@ const email = data?.session?.user?.email || null;
     if(!authModal) return;
     authModal.style.display = "block";
     // default to password, but keep prior selection if present
-    const last = sessionStorage.getItem("vp_auth_tab") || "password";
+    const last = ssGet("vp_auth_tab") || "password";
     setAuthTab(last);
   }
 
@@ -2192,8 +2197,8 @@ if(clearScanDebug) {
   authModalClose.addEventListener("click", closeAuthModal);
   authModal.addEventListener("click", (e) => { if(e.target === authModal.firstElementChild) closeAuthModal(); });
 
-  authTabPassword.addEventListener("click", () => { sessionStorage.setItem("vp_auth_tab","password"); setAuthTab("password"); });
-  authTabMagic.addEventListener("click", () => { sessionStorage.setItem("vp_auth_tab","magic"); setAuthTab("magic"); });
+  authTabPassword.addEventListener("click", () => { ssSet("vp_auth_tab","password"); setAuthTab("password"); });
+  authTabMagic.addEventListener("click", () => { ssSet("vp_auth_tab","magic"); setAuthTab("magic"); });
 
   authSignInBtn.addEventListener("click", signInWithPasswordUI);
   authSendLinkBtn.addEventListener("click", sendMagicLink);
