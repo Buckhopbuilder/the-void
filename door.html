@@ -361,7 +361,7 @@ window.__BUILD = "v12.5";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.6 (offline pack + sign-in fix)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.7.1 (offline pack + sign-in fix)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -552,11 +552,16 @@ window.addEventListener("DOMContentLoaded", () => {
   // ==== Config ====
   const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
   const SUPABASE_ANON_KEY = "sb_publishable_ma90uwKLz7Igb_xn9nXVwQ_W6k2KfiH";
-
-  const { createClient } = supabase;
-  const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-  // ==== Helpers ====
+  // ==== Supabase client (guarded) ====
+  let sb = null;
+  try {
+    const { createClient } = (window.supabase || {});
+    if (!createClient) throw new Error("supabase-js not loaded (window.supabase.createClient missing)");
+    sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  } catch (e) {
+    console.error("Supabase init failed:", e);
+  }
+// ==== Helpers ====
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
   const maskEmail = (email) => {
@@ -1254,8 +1259,10 @@ function clearSelectionOnly() {
 
   // ==== Auth ====
   async function ensureAuth() {
-    const { data } = await sb.auth.getSession();
-    const email = data?.session?.user?.email || null;
+    if(!sb) { setPill(authPill, "SB missing", "err"); return false; }
+    try {
+      const { data } = await sb.auth.getSession();
+const email = data?.session?.user?.email || null;
     if(email) {
       setPill(authPill, "good", "Signed in");
       authPill.title = email;
@@ -1266,6 +1273,12 @@ function clearSelectionOnly() {
     authPill.title = "";
     if(authBtn) authBtn.textContent = "Sign in";
     return false;
+    } catch (e) {
+      console.error("ensureAuth failed:", e);
+      try { setPill(authPill, "bad", "Auth blocked"); authPill.title=""; } catch(_e) {}
+      if(authBtn) authBtn.textContent = "Sign in";
+      return false;
+    }
   }
 
   function setAuthTab(which) {
@@ -2189,9 +2202,15 @@ if(clearScanDebug) {
   [authEmailPw, authPassword].forEach(el => el.addEventListener("keydown", (e) => { if(e.key === "Enter") signInWithPasswordUI(); }));
   [authEmailMagic].forEach(el => el.addEventListener("keydown", (e) => { if(e.key === "Enter") sendMagicLink(); }));
 (async () => {
-    await ensureAuth();
-    await resolveActiveEvent();
-    await refreshOfflinePackStatus();
+    try {
+      await ensureAuth();
+    } catch(e) { console.error(e); }
+    try {
+      await resolveActiveEvent();
+    } catch(e) { console.error(e); }
+    try {
+      await refreshOfflinePackStatus();
+    } catch(e) { console.error(e); }
     setManual(false);
     setMode("scan");
     applyMode();
