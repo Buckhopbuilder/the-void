@@ -361,7 +361,7 @@ window.__BUILD = "v12.5";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.7.2 (offline pack + sign-in fix)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.7.3 (offline pack + sign-in fix)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -1745,7 +1745,12 @@ if(clearScanDebug) {
   }
 
   // Camera entrypoint stub (wired in next step)
-  async 
+  // Camera entrypoint for scanner loop
+  async function handleCameraDecoded(decodedText) {
+    await processScanToken(decodedText || "", "camera");
+  }
+  window.__vp_handleCameraDecoded = handleCameraDecoded;
+
   if(clearScanBtn) {
     clearScanBtn.addEventListener("click", () => {
       if(scanPayload) scanPayload.value = "";
