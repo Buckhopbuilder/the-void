@@ -343,6 +343,18 @@ window.__BUILD = "v12.5";
     }
     body.mode-scan #debugBtn { display: none !important; }
 
+
+    /* ===== Camera Scanner ===== */
+    #camVideo {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.25);
+      display: block;
+    }
+    .scanRowTight { display:flex; gap:8px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+    .scanKpi { font-size:12px; color: var(--muted); margin-top:6px; }
+
 </style>
 </head>
 <body class="mode-scan">
@@ -380,7 +392,29 @@ window.__BUILD = "v12.5";
           </div>
 
           
-          <div class="card" id="offlinePackCard" style="margin-top:12px;">
+          
+          <div class="card" id="cameraCard" style="margin-top:12px;">
+            <div class="row" style="justify-content:space-between; gap:10px; align-items:flex-start;">
+              <div style="min-width:0;">
+                <div style="font-weight:800;">Camera scanner</div>
+                <div class="muted" id="camStatus">Off</div>
+                <div class="scanKpi" id="camKpi" style="display:none;"></div>
+              </div>
+              <div class="scanRowTight">
+                <button id="camStartBtn" class="primary">Start camera</button>
+                <button id="camStopBtn" disabled>Stop</button>
+                <button id="camSoundBtn">Sound: On</button>
+              </div>
+            </div>
+            <div style="margin-top:10px;">
+              <video id="camVideo" playsinline muted></video>
+            </div>
+            <div class="tiny" style="margin-top:10px; opacity:.8;">
+              Point the camera at a VoidPass QR. Decodes are auto-processed, debounced, and auto-rearmed.
+            </div>
+          </div>
+
+<div class="card" id="offlinePackCard" style="margin-top:12px;">
             <div class="row" style="justify-content:space-between; gap:10px; align-items:flex-start;">
               <div style="min-width:0;">
                 <div style="font-weight:800;">Offline pack</div>
@@ -644,6 +678,15 @@ window.addEventListener("DOMContentLoaded", () => {
   const scanDebugOut = $("scanDebugOut");
   const copyScanDebug = $("copyScanDebug");
   const clearScanDebug = $("clearScanDebug");
+
+  // Camera elements
+  const camVideo = $("camVideo");
+  const camStatus = $("camStatus");
+  const camKpi = $("camKpi");
+  const camStartBtn = $("camStartBtn");
+  const camStopBtn = $("camStopBtn");
+  const camSoundBtn = $("camSoundBtn");
+
 
 
   const selTitle = $("selTitle");
@@ -981,6 +1024,195 @@ async function copyTextToClipboard(txt) {
       setTimeout(() => { try{ qInput.focus(); }catch(_e){} }, 50);
     }
   }
+
+
+  // ===== Camera Scanner Controller (BarcodeDetector) =====
+  const SCAN_SAME_PAYLOAD_MS = 1200;
+  const SCAN_COOLDOWN_MS = 900;
+  const SCAN_LOOP_MS = 140;
+
+  let camStream = null;
+  let camRunning = false;
+  let camDetector = null;
+  let camTimer = null;
+
+  let camProcessing = false;
+  let lastPayload = "";
+  let lastPayloadAt = 0;
+  let soundOn = true;
+  let audioCtx = null;
+
+  function camSetStatus(msg) {
+    if(camStatus) camStatus.textContent = msg || "";
+  }
+
+  function camSetButtons() {
+    if(camStartBtn) camStartBtn.disabled = camRunning;
+    if(camStopBtn) camStopBtn.disabled = !camRunning;
+    if(camSoundBtn) camSoundBtn.textContent = soundOn ? "Sound: On" : "Sound: Off";
+  }
+
+  function camBeep(kind) {
+    if(!soundOn) return;
+    try {
+      if(!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const ctx = audioCtx;
+      const o = ctx.createOscillator();
+      const g = ctx.createGain();
+      o.type = "sine";
+      // simple tones: warn=900, good=1200, bad=500
+      const f = (kind === "good") ? 1200 : (kind === "bad") ? 500 : 900;
+      o.frequency.value = f;
+      g.gain.value = 0.04;
+      o.connect(g);
+      g.connect(ctx.destination);
+      o.start();
+      setTimeout(() => { try { o.stop(); } catch(_e) {} }, 80);
+    } catch(_e) {}
+  }
+
+  function shouldAcceptPayload(payload) {
+    const now = Date.now();
+    if(camProcessing) return false;
+    if(payload && payload === lastPayload && (now - lastPayloadAt) < SCAN_SAME_PAYLOAD_MS) return false;
+    lastPayload = payload || "";
+    lastPayloadAt = now;
+    return true;
+  }
+
+  async function handleDecodedPayload(payload) {
+    const raw = normalizeScanInput(payload);
+    if(!raw) return;
+
+    if(!shouldAcceptPayload(raw)) return;
+
+    camProcessing = true;
+    camSetStatus("QR detected — processing…");
+    camSetButtons();
+    camBeep("warn");
+
+    try {
+      // Show in the existing input for transparency/debug
+      if(scanPayload) scanPayload.value = raw;
+
+      // Call the shared reference path (Option B)
+      if(typeof processScanToken === "function") {
+        await processScanToken(raw, "camera");
+      } else if(typeof window.processScanToken === "function") {
+        await window.processScanToken(raw, "camera");
+      } else {
+        // Last resort fallback: click the button (should not be needed)
+        if(processScanBtn) processScanBtn.click();
+      }
+
+      camBeep("good");
+    } catch(_e) {
+      camBeep("bad");
+    } finally {
+      // cooldown then rearm
+      setTimeout(() => {
+        camProcessing = false;
+        if(camRunning) camSetStatus("Scanning…");
+        camSetButtons();
+      }, SCAN_COOLDOWN_MS);
+    }
+  }
+
+  async function camStart() {
+    if(camRunning) return;
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      camSetStatus("Camera not supported on this browser.");
+      return;
+    }
+
+    camSetStatus("Starting camera…");
+    camSetButtons();
+
+    try {
+      // Prefer environment (rear) camera
+      camStream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      });
+
+      if(camVideo) {
+        camVideo.srcObject = camStream;
+        await camVideo.play().catch(() => {});
+      }
+
+      // BarcodeDetector is the fastest native QR scanner on supported browsers
+      if("BarcodeDetector" in window) {
+        try {
+          camDetector = new window.BarcodeDetector({ formats: ["qr_code"] });
+        } catch(_e) {
+          camDetector = new window.BarcodeDetector();
+        }
+      } else {
+        camDetector = null;
+      }
+
+      camRunning = true;
+      camProcessing = false;
+      camSetStatus(camDetector ? "Scanning…" : "BarcodeDetector unavailable (next step: jsQR fallback).");
+      camSetButtons();
+
+      if(camKpi) {
+        camKpi.style.display = "";
+        camKpi.textContent = camDetector ? "Using native BarcodeDetector" : "No native scanner — fallback required";
+      }
+
+      // Start scan loop
+      if(camDetector) {
+        camTimer = setInterval(async () => {
+          if(!camRunning) return;
+          if(camProcessing) return;
+          if(!camVideo || camVideo.readyState < 2) return;
+
+          try {
+            const codes = await camDetector.detect(camVideo);
+            if(codes && codes.length) {
+              const val = codes[0].rawValue || codes[0].data || "";
+              if(val) handleDecodedPayload(val);
+            }
+          } catch(_e) {
+            // ignore transient detector errors
+          }
+        }, SCAN_LOOP_MS);
+      }
+    } catch (e) {
+      camRunning = false;
+      camSetButtons();
+      camSetStatus("Camera permission denied or unavailable.");
+      try { if(camStream) camStream.getTracks().forEach(t => t.stop()); } catch(_e) {}
+      camStream = null;
+    }
+  }
+
+  function camStop() {
+    camRunning = false;
+    camProcessing = false;
+    if(camTimer) { try { clearInterval(camTimer); } catch(_e) {} }
+    camTimer = null;
+
+    try { if(camVideo) { camVideo.pause(); camVideo.srcObject = null; } } catch(_e) {}
+    try { if(camStream) camStream.getTracks().forEach(t => t.stop()); } catch(_e) {}
+    camStream = null;
+
+    camSetStatus("Off");
+    camSetButtons();
+  }
+
+  function camToggleSound() {
+    soundOn = !soundOn;
+    camSetButtons();
+  }
+
+  // Expose a stable hook (useful for testing from console)
+  window.__vp_handleCameraDecoded = (txt) => handleDecodedPayload(txt);
 
   function setMode(newMode) {
     mode = newMode;
@@ -1495,14 +1727,7 @@ if(clearScanDebug) {
   }
 
   // Camera entrypoint stub (wired in next step)
-  async function handleCameraDecoded(decodedText) {
-    const s = String(decodedText || "").trim();
-    if (!s) return;
-    try { if (scanPayload) scanPayload.value = s; } catch (_e) {}
-    await processScanToken(s, "camera");
-  }
-  window.__vp_handleCameraDecoded = handleCameraDecoded;
-
+  async 
   if(clearScanBtn) {
     clearScanBtn.addEventListener("click", () => {
       if(scanPayload) scanPayload.value = "";
@@ -1515,6 +1740,19 @@ if(clearScanDebug) {
       setManual(true);
     });
   }
+
+
+  // ==== Camera controls ====
+  if(camStartBtn) camStartBtn.addEventListener("click", async () => { await camStart(); });
+  if(camStopBtn) camStopBtn.addEventListener("click", () => { camStop(); });
+  if(camSoundBtn) camSoundBtn.addEventListener("click", () => { camToggleSound(); });
+
+  document.addEventListener("visibilitychange", () => {
+    // Stop camera when tab is hidden to prevent "stuck camera" issues
+    if(document.hidden) camStop();
+  });
+
+  camSetButtons();
 
 
   // ==== Offline pack controls ====
