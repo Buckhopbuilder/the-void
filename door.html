@@ -10,7 +10,7 @@
   <title>VoidPass — Door</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 // Build stamp
-window.__BUILD = "v12.12";
+window.__BUILD = "v12.13";
 </script>
   <style>
     :root {
@@ -371,7 +371,7 @@ window.__BUILD = "v12.12";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.12 (offline master MVP)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.13 (offline master + manual sync)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -432,12 +432,14 @@ window.__BUILD = "v12.12";
                 <div class="muted" id="offlinePackStatus">Checking…</div>
                 <div class="muted" id="offlinePackDetails" style="margin-top:6px; display:none;"></div>
                 <div class="muted" id="offlineModeStatus" style="margin-top:6px; display:none;"></div>
+                <div class="muted" id="offlineSyncStatus" style="margin-top:6px; display:none;"></div>
               </div>
               <div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
                 <button id="downloadOfflinePackBtn" class="primary">Download</button>
                 <button id="clearOfflinePackBtn">Clear</button>
                 <button id="armOfflineBtn" class="good" style="display:none;">Arm Offline Master</button>
                 <button id="disarmOfflineBtn" class="danger" style="display:none;">Disarm</button>
+                <button id="syncOfflineBtn" class="primary" style="display:none;">Sync Offline</button>
               </div>
             </div>
           </div>
@@ -848,6 +850,175 @@ function appendOfflineLog(eventId, entry) {
     if(arr.length > 2000) arr.length = 2000;
     localStorage.setItem(key, JSON.stringify(arr));
   } catch(_e) {}
+  try { refreshOfflineSyncUI(); } catch(_e) {}
+}
+
+
+function getOfflineLog(eventId) {
+  try {
+    const raw = localStorage.getItem(lsKeyLog(eventId));
+    if(!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch(_e) { return []; }
+}
+
+function saveOfflineLog(eventId, arr) {
+  try {
+    localStorage.setItem(lsKeyLog(eventId), JSON.stringify(arr || []));
+  } catch(_e) {}
+}
+
+function offlinePendingCount(eventId) {
+  if(!eventId) return 0;
+  const arr = getOfflineLog(eventId);
+  // pending = offline_checkin entries not marked synced
+  let n = 0;
+  for(const e of arr) {
+    if(e && e.action === 'offline_checkin' && !e.synced_at) n++;
+  }
+  return n;
+}
+
+function refreshOfflineSyncUI() {
+  try {
+    if(!offlineSyncStatusEl || !syncOfflineBtn) return;
+    if(!activeEventId) {
+      offlineSyncStatusEl.style.display = 'none';
+      syncOfflineBtn.style.display = 'none';
+      return;
+    }
+    const pending = offlinePendingCount(activeEventId);
+
+    if(!navigator.onLine) {
+      // Offline: show pending count but hide sync button
+      if(pending > 0) {
+        offlineSyncStatusEl.style.display = '';
+        offlineSyncStatusEl.textContent = `Offline log: ${pending} pending (will sync when online)`;
+      } else {
+        offlineSyncStatusEl.style.display = 'none';
+        offlineSyncStatusEl.textContent = '';
+      }
+      syncOfflineBtn.style.display = 'none';
+      return;
+    }
+
+    // Online
+    if(pending > 0) {
+      offlineSyncStatusEl.style.display = '';
+      offlineSyncStatusEl.textContent = `Offline log: ${pending} pending`;
+      syncOfflineBtn.style.display = '';
+      syncOfflineBtn.disabled = false;
+    } else {
+      offlineSyncStatusEl.style.display = 'none';
+      offlineSyncStatusEl.textContent = '';
+      syncOfflineBtn.style.display = 'none';
+    }
+  } catch(_e) {}
+}
+
+async function syncOfflineLogNow() {
+  if(!activeEventId) return;
+  if(!navigator.onLine) {
+    showOverlay('warn', 'Offline', 'Cannot sync while offline.', [
+      { text:'OK', cls:'primary', onClick: () => hideOverlay() }
+    ]);
+    return;
+  }
+
+  const pending = offlinePendingCount(activeEventId);
+  if(pending <= 0) {
+    refreshOfflineSyncUI();
+    showOverlay('good', 'No pending offline scans', 'Nothing to sync.', [
+      { text:'OK', cls:'primary', onClick: () => hideOverlay() }
+    ]);
+    return;
+  }
+
+  const okGo = confirm(`Sync ${pending} offline check-ins to the backend now?`);
+  if(!okGo) return;
+
+  // disable button during sync
+  if(syncOfflineBtn) syncOfflineBtn.disabled = true;
+
+  const arr = getOfflineLog(activeEventId);
+  // process oldest->newest: arr is newest-first (we unshift), so reverse copy
+  const oldestFirst = Array.isArray(arr) ? arr.slice().reverse() : [];
+
+  let applied = 0;
+  let already = 0;
+  let denied = 0;
+  let failed = 0;
+
+  // We'll rebuild a new array, keeping unsynced entries if a network error happens
+  const newArr = arr.slice();
+
+  for(const e of oldestFirst) {
+    if(!e || e.action !== 'offline_checkin' || e.synced_at) continue;
+
+    const rid = e.registration_id;
+    if(!rid) continue;
+
+    // Try backend atomic check-in using canonical method "qr".
+    const res = await rpcDoorCheckinAtomic(rid, 'qr');
+
+    if(!res || !res.ok) {
+      failed++;
+      // Stop immediately on connectivity/API failure to avoid partial confusion
+      break;
+    }
+
+    const row = res.row || {};
+    const ok = row.ok === true;
+    const code = String(row.code || row.status || '').trim();
+
+    if(ok) {
+      applied++;
+    } else {
+      // Treat common outcomes as resolved
+      if(code === 'already_checked_in' || code === 'no_entries_remaining' || code === 'registration_already_checked_in') already++;
+      else denied++;
+    }
+
+    // Mark the matching entry in newArr as synced
+    for(const ne of newArr) {
+      if(ne && ne.action === 'offline_checkin' && !ne.synced_at && ne.registration_id === rid && ne.ts === e.ts) {
+        ne.synced_at = new Date().toISOString();
+        ne.sync_code = ok ? 'applied' : (code || 'denied');
+        break;
+      }
+    }
+  }
+
+  // If we failed mid-run, keep everything as-is (including newly marked synced), but do not prune.
+  // If we didn't fail, prune synced entries to keep log small.
+  let finalArr = newArr;
+  if(failed == 0) {
+    finalArr = newArr.filter(x => !(x && x.action === 'offline_checkin' && x.synced_at));
+  }
+
+  saveOfflineLog(activeEventId, finalArr);
+  refreshOfflineSyncUI();
+
+  if(syncOfflineBtn) syncOfflineBtn.disabled = false;
+
+  if(failed > 0) {
+    showOverlay('warn', 'Sync paused', `Sync stopped due to a backend/network error.
+
+Applied: ${applied}
+Already: ${already}
+Denied: ${denied}
+Pending remaining: ${offlinePendingCount(activeEventId)}`, [
+      { text:'OK', cls:'primary', onClick: () => hideOverlay() }
+    ]);
+    return;
+  }
+
+  showOverlay('good', 'Sync complete', `Applied: ${applied}
+Already: ${already}
+Denied: ${denied}`, [
+    { text:'OK', cls:'primary', onClick: () => hideOverlay() }
+  ]);
 }
 
 function offlineLocalCheckin(eventId, rawToken) {
@@ -945,6 +1116,8 @@ const offlineModeStatusEl = $("offlineModeStatus");
 const armOfflineBtn = $("armOfflineBtn");
 const disarmOfflineBtn = $("disarmOfflineBtn");
 const netPill = $("netPill");
+const syncOfflineBtn = $("syncOfflineBtn");
+const offlineSyncStatusEl = $("offlineSyncStatus");
 
 
 function setOfflinePackUI(state) {
@@ -2170,10 +2343,19 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
     });
   }
 
-  // Net status + offline UI refresh
-  window.addEventListener("online", () => { try { setNetPillUI(); updateOfflineMasterUI(); } catch(_e) {} });
-  window.addEventListener("offline", () => { try { setNetPillUI(); updateOfflineMasterUI(); } catch(_e) {} });
-  try { setNetPillUI(); updateOfflineMasterUI(); } catch(_e) {}
+  
+  if(syncOfflineBtn) {
+    syncOfflineBtn.addEventListener("click", async () => {
+      try { await syncOfflineLogNow(); } catch(e) {
+        showOverlay('bad','Sync failed', String(e?.message || e), [{ text:'OK', cls:'primary', onClick: () => hideOverlay() }]);
+      }
+    });
+  }
+
+// Net status + offline UI refresh
+  window.addEventListener("online", () => { try { setNetPillUI(); updateOfflineMasterUI(); refreshOfflineSyncUI(); } catch(_e) {} });
+  window.addEventListener("offline", () => { try { setNetPillUI(); updateOfflineMasterUI(); refreshOfflineSyncUI(); } catch(_e) {} });
+  try { setNetPillUI(); updateOfflineMasterUI(); refreshOfflineSyncUI(); } catch(_e) {}
 
   // ==== Sheet minimize toggle (now functional) ====
   let sheetMin = false;
