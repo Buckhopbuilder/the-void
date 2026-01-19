@@ -11,6 +11,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 // Build stamp
 window.__BUILD = "v12.14";
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("build-label").textContent =
+    `build ${window.__BUILD || "unknown"} (polish offline sync + export)`;
+});    
 </script>
   <style>
     :root {
@@ -371,7 +376,10 @@ window.__BUILD = "v12.14";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.13 (offline master + manual sync)</span></div>
+        <div class="brand">
+          VoidPass — Door
+          <span id="build-label" style="font-weight:600; opacity:.65; font-size:12px;"></span>
+          </div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
