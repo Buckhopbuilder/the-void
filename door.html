@@ -10,7 +10,7 @@
   <title>VoidPass — Door</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 // Build stamp
-window.__BUILD = "v12.5";
+window.__BUILD = "v12.12";
 </script>
   <style>
     :root {
@@ -115,6 +115,16 @@ window.__BUILD = "v12.5";
     button.danger { background: rgba(239,68,68,.18); border-color: rgba(239,68,68,.45); }
     button.good { background: rgba(16,185,129,.18); border-color: rgba(16,185,129,.45); }
     button:disabled { opacity:.55; cursor:not-allowed; }
+    #offlineModeStatus {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.22);
+    }
+    #offlineModeStatus.good { background: var(--good); border-color: var(--goodStroke); color:#d9fff1; }
+    #offlineModeStatus.warn { background: var(--warn); border-color: var(--warnStroke); color:#fff4d7; }
+    #offlineModeStatus.bad  { background: var(--bad);  border-color: var(--badStroke); color:#ffe0e0; }
+
     .muted { color: var(--muted); font-size: 13px; }
     .tiny { color: var(--muted); font-size: 12px; }
     .sep { height:1px; background: rgba(255,255,255,.10); margin: 12px 0; }
@@ -361,12 +371,13 @@ window.__BUILD = "v12.5";
   <div class="wrap" id="candidatesWrap">
     <div class="topbar">
       <div>
-        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.11 (scanner + resolver fix)</span></div>
+        <div class="brand">VoidPass — Door <span style="font-weight:600; opacity:.65; font-size:12px;">build v12.12 (offline master MVP)</span></div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
         <div class="pill" id="authPill">Auth: …</div>
         <div class="pill" id="modePill">Mode: Scanner</div>
+        <div class="pill" id="netPill">Net: …</div>
         <button id="manualHold" class="holdBtn" title="Hold to enable manual lookup">
           Hold: Manual
           <div class="bar"><i id="holdBar"></i></div>
@@ -420,10 +431,13 @@ window.__BUILD = "v12.5";
                 <div style="font-weight:800;">Offline pack</div>
                 <div class="muted" id="offlinePackStatus">Checking…</div>
                 <div class="muted" id="offlinePackDetails" style="margin-top:6px; display:none;"></div>
+                <div class="muted" id="offlineModeStatus" style="margin-top:6px; display:none;"></div>
               </div>
               <div class="row" style="justify-content:flex-end; gap:8px; flex-wrap:wrap;">
                 <button id="downloadOfflinePackBtn" class="primary">Download</button>
                 <button id="clearOfflinePackBtn">Clear</button>
+                <button id="armOfflineBtn" class="good" style="display:none;">Arm Offline Master</button>
+                <button id="disarmOfflineBtn" class="danger" style="display:none;">Disarm</button>
               </div>
             </div>
           </div>
@@ -728,12 +742,210 @@ const OFFLINE_DB_NAME = "voidpass_door_db";
 const OFFLINE_DB_VERSION = 1;
 const OFFLINE_STORE = "offline_packs";
 
-let offlinePack = null; // { event_id, generated_at, count, token_hashes[] }
+let offlinePack = null; // { event_id, generated_at, count, registrations[], token_hashes[] }
+let offlinePackCache = null; // latest loaded pack for active event
+
+// ==== Offline Master Mode (P2 + S1) ====
+const OFFLINE_AUTH_WINDOW_MS = 24 * 60 * 60 * 1000; // S1: must have signed in within last 24h
+const LS_DEVICE_ID = "vp_device_id";
+const LS_LAST_AUTH_AT = "vp_last_auth_at";
+
+function uuidLooksLike(v) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(v||""));
+}
+
+function getDeviceId() {
+  try {
+    let id = localStorage.getItem(LS_DEVICE_ID);
+    if(!id) {
+      id = (crypto && crypto.randomUUID) ? crypto.randomUUID() : ("dev_" + Math.random().toString(16).slice(2) + Date.now().toString(16));
+      localStorage.setItem(LS_DEVICE_ID, id);
+    }
+    return id;
+  } catch(_e) {
+    return "dev_unknown";
+  }
+}
+
+function markAuthActivity() {
+  try { localStorage.setItem(LS_LAST_AUTH_AT, String(Date.now())); } catch(_e) {}
+}
+
+function getLastAuthAt() {
+  try { return parseInt(localStorage.getItem(LS_LAST_AUTH_AT) || "0", 10) || 0; } catch(_e) { return 0; }
+}
+
+function lsKeyMaster(eventId) { return `vp_offline_master_${eventId}`; }
+function lsKeyLedger(eventId) { return `vp_offline_ledger_${eventId}`; }
+function lsKeyLog(eventId) { return `vp_offline_log_${eventId}`; }
+
+function getMasterState(eventId) {
+  try {
+    const raw = localStorage.getItem(lsKeyMaster(eventId));
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(!obj || obj.event_id != eventId) return null;
+    return obj;
+  } catch(_e) { return null; }
+}
+
+function isMasterArmed(eventId) {
+  if(!eventId) return false;
+  const st = getMasterState(eventId);
+  if(!st) return false;
+  return st.device_id === getDeviceId() && st.armed === true;
+}
+
+function setNetPillUI() {
+  if(!netPill) return;
+  const online = navigator.onLine;
+  netPill.textContent = online ? "Net: Online" : "Net: Offline";
+  netPill.classList.remove("good","bad","warn");
+  if(online) netPill.classList.add("good");
+  else netPill.classList.add("bad");
+}
+
+function offlineEligibilityReason(pack) {
+  if(!activeEventId) return "No active event.";
+
+  // Need a downloaded offline pack with registrations
+  if(!pack || pack.event_id !== activeEventId) return "Offline pack missing for this event. Download it while online.";
+  if(!Array.isArray(pack.registrations)) return "Offline pack format is missing registrations. Re-download the pack.";
+
+  // Must have signed in recently
+  const last = getLastAuthAt();
+  if(!last) return "No recent sign-in on this device. Go online and sign in.";
+  if((Date.now() - last) > OFFLINE_AUTH_WINDOW_MS) return "Sign-in too old (must be within 24h). Go online and sign in again.";
+
+  return "";
+}
+
+function loadLedger(eventId) {
+  try {
+    const raw = localStorage.getItem(lsKeyLedger(eventId));
+    if(!raw) return null;
+    const obj = JSON.parse(raw);
+    if(!obj || obj.event_id != eventId || typeof obj.map !== 'object') return null;
+    return obj;
+  } catch(_e) { return null; }
+}
+
+function saveLedger(eventId, mapObj) {
+  try {
+    localStorage.setItem(lsKeyLedger(eventId), JSON.stringify({ event_id: eventId, saved_at: new Date().toISOString(), map: mapObj }));
+  } catch(_e) {}
+}
+
+function appendOfflineLog(eventId, entry) {
+  try {
+    const key = lsKeyLog(eventId);
+    const raw = localStorage.getItem(key);
+    let arr = [];
+    if(raw) {
+      try { arr = JSON.parse(raw) || []; } catch(_e) { arr = []; }
+    }
+    arr.unshift(entry);
+    if(arr.length > 2000) arr.length = 2000;
+    localStorage.setItem(key, JSON.stringify(arr));
+  } catch(_e) {}
+}
+
+function offlineLocalCheckin(eventId, rawToken) {
+  const token = String(rawToken || "").trim();
+  // Offline MVP supports UUID payloads (canonical)
+  if(!uuidLooksLike(token)) {
+    return { ok: false, code: "offline_uuid_only" };
+  }
+
+  const ledger = loadLedger(eventId);
+  if(!ledger || !ledger.map) {
+    return { ok: false, code: "offline_ledger_missing" };
+  }
+
+  const rid = token;
+  if(!(rid in ledger.map)) {
+    return { ok: false, code: "not_in_offline_pack" };
+  }
+
+  const cur = parseInt(ledger.map[rid] || 0, 10) || 0;
+  if(cur <= 0) {
+    return { ok: false, code: "already_used" };
+  }
+
+  ledger.map[rid] = cur - 1;
+  saveLedger(eventId, ledger.map);
+  appendOfflineLog(eventId, { ts: new Date().toISOString(), registration_id: rid, action: "offline_checkin", remaining_after: ledger.map[rid] });
+  return { ok: true, registration_id: rid, remaining_after: ledger.map[rid] };
+}
+
+function initLedgerFromPack(eventId, pack) {
+  if(!pack || !Array.isArray(pack.registrations)) return false;
+  const m = {};
+  for(const r of pack.registrations) {
+    const rid = r && (r.registration_id || r.id);
+    if(!rid) continue;
+    m[rid] = parseInt(r.entries_remaining || 0, 10) || 0;
+  }
+  saveLedger(eventId, m);
+  return true;
+}
+
+function updateOfflineMasterUI() {
+  try {
+    setNetPillUI();
+
+    const pack = offlinePackCache || offlinePack;
+    const isOffline = !navigator.onLine;
+    const armed = isMasterArmed(activeEventId);
+
+    let msg = "";
+    if(isOffline) {
+      if(armed) msg = "OFFLINE: Master armed. UUID scans will be admitted offline.";
+      else {
+        const reason = offlineEligibilityReason(pack);
+        msg = reason ? ("OFFLINE: " + reason) : "OFFLINE: This device is not armed as Master.";
+      }
+    } else {
+      // Online: show readiness state and if armed
+      if(armed) msg = "Online: Master armed (offline backup ready).";
+      else msg = "Online: Offline backup idle.";
+    }
+
+    if(offlineModeStatusEl) {
+      offlineModeStatusEl.style.display = "";
+      offlineModeStatusEl.textContent = msg;
+    }
+
+    const reason = offlineEligibilityReason(pack);
+    const canArm = !reason;
+
+    if(armOfflineBtn) {
+      armOfflineBtn.style.display = (!armed && canArm) ? "" : "none";
+      armOfflineBtn.disabled = !canArm;
+    }
+    if(disarmOfflineBtn) {
+      disarmOfflineBtn.style.display = (armed) ? "" : "none";
+    }
+
+    // Lockouts: if offline and not armed, disable scan actions
+    const shouldLock = (!navigator.onLine && !armed);
+    if(processScanBtn) processScanBtn.disabled = shouldLock;
+    if(camStartBtn) camStartBtn.disabled = shouldLock;
+
+  } catch(_e) {}
+}
+
 
 const offlinePackStatusEl = $("offlinePackStatus");
 const offlinePackDetailsEl = $("offlinePackDetails");
 const downloadOfflinePackBtn = $("downloadOfflinePackBtn");
 const clearOfflinePackBtn = $("clearOfflinePackBtn");
+
+const offlineModeStatusEl = $("offlineModeStatus");
+const armOfflineBtn = $("armOfflineBtn");
+const disarmOfflineBtn = $("disarmOfflineBtn");
+const netPill = $("netPill");
+
 
 function setOfflinePackUI(state) {
   // state: { kind: "none"|"ready"|"error"|"checking"|"downloading", ... }
@@ -745,7 +957,7 @@ function setOfflinePackUI(state) {
     offlinePackStatusEl.textContent = "Downloading…";
   } else if(kind === "ready") {
     const c = state.count ?? (offlinePack?.count ?? 0);
-    offlinePackStatusEl.textContent = `Ready ✓ (${c} tokens)`;
+    offlinePackStatusEl.textContent = `Ready ✓ (${c} regs)`;
   } else if(kind === "error") {
     offlinePackStatusEl.textContent = `Error: ${state.message || "unknown"}`;
   } else {
@@ -910,18 +1122,21 @@ async function refreshOfflinePackStatus() {
   setOfflinePackUI({ kind: "checking" });
   try {
     const local = await idbGetOfflinePack(activeEventId);
-    if(local && local.event_id === activeEventId && Array.isArray(local.token_hashes)) {
+    if(local && local.event_id === activeEventId && Array.isArray(local.registrations)) {
       offlinePack = local;
+      offlinePackCache = local;
       const ts = local.generated_at ? new Date(local.generated_at).toLocaleString() : "";
-      setOfflinePackUI({ kind: "ready", count: local.count ?? local.token_hashes.length, details: ts ? `Downloaded: ${ts}` : "" });
+      setOfflinePackUI({ kind: "ready", count: local.count ?? local.registrations.length, details: ts ? `Downloaded: ${ts}` : "" });
     } else {
       offlinePack = null;
       setOfflinePackUI({ kind: "none" });
     }
   } catch(e) {
     offlinePack = null;
+    offlinePackCache = null;
     setOfflinePackUI({ kind: "error", message: (e?.message || String(e)), details: "IndexedDB not available." });
   }
+  try { updateOfflineMasterUI(); } catch(_e) {}
 }
 
 async function downloadOfflinePack() {
@@ -950,18 +1165,22 @@ async function downloadOfflinePack() {
         const msg = pack?.error || "invalid_response";
         throw new Error(msg);
       }
-      const hashes = pack.token_hashes;
-      if(!Array.isArray(hashes)) throw new Error("token_hashes_missing");
+      const regs = pack.registrations;
+      if(!Array.isArray(regs)) throw new Error("registrations_missing");
+      const hashes = Array.isArray(pack.token_hashes) ? pack.token_hashes : [];
       const stored = {
         event_id: pack.event_id || activeEventId,
         generated_at: pack.generated_at || new Date().toISOString(),
-        count: pack.count ?? hashes.length,
+        count: pack.count ?? regs.length,
+        registrations: regs,
         token_hashes: hashes,
       };
       await idbPutOfflinePack(stored);
       offlinePack = stored;
+      offlinePackCache = stored;
       const ts = stored.generated_at ? new Date(stored.generated_at).toLocaleString() : "";
       setOfflinePackUI({ kind: "ready", count: stored.count, details: ts ? `Downloaded: ${ts}` : "" });
+      try { updateOfflineMasterUI(); } catch(_e) {}
       return;
     } catch(e) {
       lastErr = e;
@@ -981,7 +1200,9 @@ async function clearOfflinePack() {
     await idbDeleteOfflinePack(activeEventId);
   } catch(_e) {}
   offlinePack = null;
+  offlinePackCache = null;
   setOfflinePackUI({ kind: "none" });
+  try { updateOfflineMasterUI(); } catch(_e) {}
 }
 
 
@@ -1271,6 +1492,7 @@ function clearSelectionOnly() {
 const email = data?.session?.user?.email || null;
     if(email) {
       setPill(authPill, "good", "Signed in");
+      try { markAuthActivity(); } catch(_e) {}
       authPill.title = email;
       if(authBtn) authBtn.textContent = "Sign out";
       return true;
@@ -1374,6 +1596,8 @@ async function signOut() {
       activeEventId = null;
     }
     eventPill.textContent = "Event: " + (activeEventId ? activeEventId : "none");
+    try { await refreshOfflinePackStatus(); } catch(_e) {}
+    try { updateOfflineMasterUI(); } catch(_e) {}
     return activeEventId;
   }
 
@@ -1609,6 +1833,66 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
               return;
             }
 
+            // OFFLINE path (no backend)
+            if(!navigator.onLine) {
+              await refreshOfflinePackStatus();
+              const pack = offlinePackCache || offlinePack;
+              const reason = offlineEligibilityReason(pack);
+
+              // If not eligible, show why
+              if(reason) {
+                trace.outcome = { ok:false, code:"offline_not_ready", reason };
+                if(scanDebugOn) pushScanDebug(trace);
+                setScanStatus("bad","OFFLINE: not_ready");
+                showOverlay("bad", "OFFLINE — Not ready", reason, [
+                  { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+                ]);
+                haptic("bad");
+                return;
+              }
+
+              // If not armed, offer to arm
+              if(!isMasterArmed(activeEventId)) {
+                trace.outcome = { ok:false, code:"offline_not_master" };
+                if(scanDebugOn) pushScanDebug(trace);
+                setScanStatus("warn","OFFLINE: not_master");
+                showOverlay("warn", "OFFLINE", "This device is not armed as the Offline Master.", [
+                  { text: "Arm Offline Master", cls: "primary", onClick: () => { hideOverlay(); try{ armOfflineBtn && armOfflineBtn.click(); }catch(_e){} } },
+                  { text: "OK", cls: "", onClick: () => hideOverlay() },
+                ]);
+                haptic("warn");
+                return;
+              }
+
+              // Offline local check-in (UUID only)
+              const oc = offlineLocalCheckin(activeEventId, raw);
+              if(!oc.ok) {
+                const code = oc.code || "offline_failed";
+                trace.outcome = { ok:false, code };
+                if(scanDebugOn) pushScanDebug(trace);
+                let msg = "Offline scan not accepted.";
+                if(code === "offline_uuid_only") msg = "Offline scanning supports UUID QRs only.";
+                else if(code === "offline_ledger_missing") msg = "Offline ledger missing. Arm Offline Master again.";
+                else if(code === "not_in_offline_pack") msg = "This UUID is not in the offline pack for this event.";
+                else if(code === "already_used") msg = "Already scanned (offline).";
+                setScanStatus(code === "already_used" ? "warn" : "bad", "OFFLINE: " + code);
+                showOverlay(code === "already_used" ? "warn" : "bad", "OFFLINE", msg, [
+                  { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+                ]);
+                haptic(code === "already_used" ? "warn" : "bad");
+                return;
+              }
+
+              trace.outcome = { ok:true, code:"offline_checked_in", remaining_after: oc.remaining_after };
+              if(scanDebugOn) pushScanDebug(trace);
+              haptic("good");
+              setScanStatus("good","OFFLINE: checked in");
+              showOverlay("good", "OFFLINE ✅ Checked in", `Remaining entries on this pass: ${oc.remaining_after}`, [
+                { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+              ]);
+              return;
+            }
+
             // Prevent double-taps
             processScanBtn.disabled = true;
             setScanStatus("warn","Processing scan…");
@@ -1821,6 +2105,75 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
       await clearOfflinePack();
     });
   }
+
+  if(armOfflineBtn) {
+    armOfflineBtn.addEventListener("click", async () => {
+      try {
+        await refreshOfflinePackStatus();
+        const pack = offlinePackCache || offlinePack;
+        const reason = offlineEligibilityReason(pack);
+        if(reason) {
+          showOverlay("bad", "OFFLINE — Not ready", reason, [
+            { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+          ]);
+          return;
+        }
+        if(!activeEventId) {
+          showOverlay("bad", "OFFLINE", "No active event.", [
+            { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+          ]);
+          return;
+        }
+
+        const c1 = confirm("Arm OFFLINE MASTER MODE on this device?\n\nOnly ONE device should scan while offline.");
+        if(!c1) return;
+        const c2 = confirm("Confirm: this will be the ONLY scanning device while offline.");
+        if(!c2) return;
+
+        // Init ledger from pack
+        const ok = initLedgerFromPack(activeEventId, pack);
+        if(!ok) {
+          showOverlay("bad", "OFFLINE", "Could not initialize offline ledger. Re-download the pack.", [
+            { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+          ]);
+          return;
+        }
+
+        try {
+          const st = { event_id: activeEventId, device_id: getDeviceId(), armed: true, armed_at: new Date().toISOString() };
+          localStorage.setItem(lsKeyMaster(activeEventId), JSON.stringify(st));
+          appendOfflineLog(activeEventId, { ts: st.armed_at, action: "offline_master_armed", device_id: st.device_id });
+        } catch(_e) {}
+
+        updateOfflineMasterUI();
+        showOverlay("good", "Offline Master Armed", "This device is now the Offline Master for this event.\n\nWhen reception drops, UUID scans will be validated locally.", [
+          { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+        ]);
+      } catch(e) {
+        showOverlay("bad", "OFFLINE", String(e?.message || e), [
+          { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+        ]);
+      }
+    });
+  }
+
+  if(disarmOfflineBtn) {
+    disarmOfflineBtn.addEventListener("click", () => {
+      try {
+        if(!activeEventId) return;
+        const c = confirm("Disarm Offline Master Mode on this device?");
+        if(!c) return;
+        localStorage.removeItem(lsKeyMaster(activeEventId));
+        appendOfflineLog(activeEventId, { ts: new Date().toISOString(), action: "offline_master_disarmed", device_id: getDeviceId() });
+      } catch(_e) {}
+      updateOfflineMasterUI();
+    });
+  }
+
+  // Net status + offline UI refresh
+  window.addEventListener("online", () => { try { setNetPillUI(); updateOfflineMasterUI(); } catch(_e) {} });
+  window.addEventListener("offline", () => { try { setNetPillUI(); updateOfflineMasterUI(); } catch(_e) {} });
+  try { setNetPillUI(); updateOfflineMasterUI(); } catch(_e) {}
 
   // ==== Sheet minimize toggle (now functional) ====
   let sheetMin = false;
