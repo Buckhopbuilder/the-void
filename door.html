@@ -10,7 +10,7 @@
   <title>VoidPass — Door</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
 // Build stamp
-window.__BUILD = "v12.13";
+window.__BUILD = "v12.14";
 </script>
   <style>
     :root {
@@ -440,6 +440,7 @@ window.__BUILD = "v12.13";
                 <button id="armOfflineBtn" class="good" style="display:none;">Arm Offline Master</button>
                 <button id="disarmOfflineBtn" class="danger" style="display:none;">Disarm</button>
                 <button id="syncOfflineBtn" class="primary" style="display:none;">Sync Offline</button>
+                <button id="exportOfflineBtn" style="display:none;">Export</button>
               </div>
             </div>
           </div>
@@ -869,6 +870,14 @@ function saveOfflineLog(eventId, arr) {
   } catch(_e) {}
 }
 
+function lsKeyReceipt(eventId){ return `vp_offline_sync_receipt__${eventId}`; }
+function getSyncReceipt(eventId){
+  try{ const raw=localStorage.getItem(lsKeyReceipt(eventId)); if(!raw) return null; return JSON.parse(raw); }catch(_e){ return null; }
+}
+function setSyncReceipt(eventId, receipt){
+  try{ localStorage.setItem(lsKeyReceipt(eventId), JSON.stringify(receipt||null)); }catch(_e){}
+}
+
 function offlinePendingCount(eventId) {
   if(!eventId) return 0;
   const arr = getOfflineLog(eventId);
@@ -914,6 +923,24 @@ function refreshOfflineSyncUI() {
       offlineSyncStatusEl.textContent = '';
       syncOfflineBtn.style.display = 'none';
     }
+  
+
+    // Show last sync receipt if present
+    const rec = getSyncReceipt(activeEventId);
+    if(rec && offlineSyncStatusEl && navigator.onLine) {
+      const when = rec.at ? new Date(rec.at).toLocaleString() : '';
+      const line = `Offline log: ${pending} pending`;
+      const receiptLine = `Last sync: ${when} (Applied ${rec.applied||0}, Already ${rec.already||0}, Denied ${rec.denied||0})`;
+      offlineSyncStatusEl.textContent = pending > 0 ? (line + ' — ' + receiptLine) : receiptLine;
+      offlineSyncStatusEl.style.display = '';
+    }
+
+    // Export button: show if any offline log exists
+    if(exportOfflineBtn) {
+      const log = getOfflineLog(activeEventId);
+      exportOfflineBtn.style.display = (log && log.length) ? '' : 'none';
+    }
+
   } catch(_e) {}
 }
 
@@ -1002,6 +1029,9 @@ async function syncOfflineLogNow() {
 
   if(syncOfflineBtn) syncOfflineBtn.disabled = false;
 
+  // Persist a simple receipt for ops visibility
+  try { setSyncReceipt(activeEventId, { at: new Date().toISOString(), applied, already, denied, failed }); } catch(_e) {}
+
   if(failed > 0) {
     showOverlay('warn', 'Sync paused', `Sync stopped due to a backend/network error.
 
@@ -1013,6 +1043,9 @@ Pending remaining: ${offlinePendingCount(activeEventId)}`, [
     ]);
     return;
   }
+
+  // Save last sync receipt
+  try { setSyncReceipt(activeEventId, { at: new Date().toISOString(), applied, already, denied }); } catch(_e) {}
 
   showOverlay('good', 'Sync complete', `Applied: ${applied}
 Already: ${already}
@@ -1118,6 +1151,7 @@ const disarmOfflineBtn = $("disarmOfflineBtn");
 const netPill = $("netPill");
 const syncOfflineBtn = $("syncOfflineBtn");
 const offlineSyncStatusEl = $("offlineSyncStatus");
+const exportOfflineBtn = $("exportOfflineBtn");
 
 
 function setOfflinePackUI(state) {
@@ -2343,11 +2377,40 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
     });
   }
 
-  
   if(syncOfflineBtn) {
     syncOfflineBtn.addEventListener("click", async () => {
       try { await syncOfflineLogNow(); } catch(e) {
         showOverlay('bad','Sync failed', String(e?.message || e), [{ text:'OK', cls:'primary', onClick: () => hideOverlay() }]);
+      }
+    });
+  }
+
+  if(exportOfflineBtn) {
+    exportOfflineBtn.addEventListener('click', () => {
+      try {
+        if(!activeEventId) return;
+        const pack = offlinePack || offlinePackCache || null;
+        const log = getOfflineLog(activeEventId);
+        const receipt = getSyncReceipt(activeEventId);
+        const payload = {
+          build: window.__BUILD || '',
+          exported_at: new Date().toISOString(),
+          event_id: activeEventId,
+          net_online: !!navigator.onLine,
+          offline_pack: pack ? { event_id: pack.event_id, generated_at: pack.generated_at, count: pack.count } : null,
+          sync_receipt: receipt || null,
+          offline_log: log || []
+        };
+        const txt = JSON.stringify(payload, null, 2);
+        const blob = new Blob([txt], {type:'application/json'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `voidpass_offline_report_${activeEventId}_${(new Date().toISOString().replace(/[:.]/g,'-'))}.json`;
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 0);
+      } catch(_e) {
+        alert('Export failed');
       }
     });
   }
