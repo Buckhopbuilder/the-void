@@ -8,15 +8,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <title>VoidPass — Door</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-// Build stamp
-window.__BUILD = "v12.14";
-
-document.addEventListener("DOMContentLoaded", () => {
-  document.getElementById("build-label").textContent =
-    `build ${window.__BUILD || "unknown"} (polish offline sync + export)`;
-});    
-</script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    // Build stamp
+    window.__BUILD = "v12.15";
+    document.addEventListener("DOMContentLoaded", () => {
+      const el = document.getElementById("build-label");
+      if(el) el.textContent = `build ${window.__BUILD || "unknown"} (offline master + manual sync + export + loose offline admissibility)`;
+    });
+  </script>
   <style>
     :root {
       --bg:#0b1020;
@@ -377,9 +377,9 @@ document.addEventListener("DOMContentLoaded", () => {
     <div class="topbar">
       <div>
         <div class="brand">
-          VoidPass — Door
-          <span id="build-label" style="font-weight:600; opacity:.65; font-size:12px;"></span>
-          </div>
+  VoidPass — Door
+  <span id="build-label" style="font-weight:600; opacity:.65; font-size:12px; margin-left:8px;"></span>
+</div>
         <div class="tiny" id="eventPill">Event: …</div>
       </div>
       <div class="pills">
@@ -862,6 +862,17 @@ function appendOfflineLog(eventId, entry) {
   try { refreshOfflineSyncUI(); } catch(_e) {}
 }
 
+function hasOfflineAdmission(eventId, registrationId) {
+  try {
+    const log = loadOfflineLog(eventId) || [];
+    for(const e of log) {
+      if(!e) continue;
+      if(e.registration_id === registrationId && (e.action === "offline_checkin" || e.action === "offline_checkin_provisional")) return true;
+    }
+  } catch(_e) {}
+  return false;
+}
+
 
 function getOfflineLog(eventId) {
   try {
@@ -1075,8 +1086,21 @@ function offlineLocalCheckin(eventId, rawToken) {
   }
 
   const rid = token;
+
+  // Duplicate prevention within this device/session: if we already logged this rid as admitted offline, block.
+  if(hasOfflineAdmission(eventId, rid)) {
+    return { ok: false, code: "already_used" };
+  }
+
+  // New rule: offline-admissible if present in pack ledger with entries_remaining>0.
+  // If the ledger doesn't contain the rid (pack mismatch / stale ledger), allow a single provisional offline admit.
+  // This keeps the door moving and relies on later manual sync to reconcile with backend.
   if(!(rid in ledger.map)) {
-    return { ok: false, code: "not_in_offline_pack" };
+    // Provisional admit: record it, and lock it out from repeated offline admits on this device.
+    ledger.map[rid] = 0;
+    saveLedger(eventId, ledger.map);
+    appendOfflineLog(eventId, { ts: new Date().toISOString(), registration_id: rid, action: "offline_checkin_provisional", remaining_after: 0, note: "rid_not_in_ledger" });
+    return { ok: true, registration_id: rid, remaining_after: 0, provisional: true };
   }
 
   const cur = parseInt(ledger.map[rid] || 0, 10) || 0;
