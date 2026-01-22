@@ -3008,7 +3008,91 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
       <div id="authModalMsg" class="tiny" style="margin-top:10px; opacity:.9;"></div>
     </div>
   </div>
+  <script>
+/* ================================
+   v12.21 – Offline Ledger Auto-Fix
+   Safe drop-in (no assumptions)
+   ================================ */
 
+(function () {
+  function findLedgerKey() {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (k.includes("ledger")) return k;
+    }
+    return "vp_offline_ledger";
+  }
 
+  function extractRegs(pack) {
+    if (!pack) return [];
+    return (
+      pack.registrations ||
+      pack.regs ||
+      pack.items ||
+      pack.rows ||
+      []
+    );
+  }
+
+  function buildLedgerFromPack(pack) {
+    const LEDGER_KEY = findLedgerKey();
+
+    try {
+      const regs = extractRegs(pack);
+      if (!regs.length) return;
+
+      const items = {};
+      for (const r of regs) {
+        const id =
+          r.registration_id ||
+          r.registrationId ||
+          r.id ||
+          r.reg_id;
+
+        if (!id) continue;
+
+        const remaining =
+          typeof r.entries_remaining === "number"
+            ? r.entries_remaining
+            : typeof r.remaining === "number"
+            ? r.remaining
+            : 1;
+
+        items[id] = {
+          used: false,
+          remaining
+        };
+      }
+
+      const ledger = {
+        version: 1,
+        event_id: pack.event_id || null,
+        generated_at: pack.generated_at || new Date().toISOString(),
+        items
+      };
+
+      localStorage.setItem(LEDGER_KEY, JSON.stringify(ledger));
+      console.info("[v12.21] Offline ledger initialized", ledger);
+    } catch (e) {
+      console.error("[v12.21] Ledger build failed", e);
+    }
+  }
+
+  // Hook into ANY offline-pack save that already exists
+  const _setItem = localStorage.setItem;
+  localStorage.setItem = function (key, value) {
+    _setItem.apply(this, arguments);
+
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && parsed.event_id && extractRegs(parsed).length) {
+        buildLedgerFromPack(parsed);
+      }
+    } catch (_) {}
+  };
+
+})();
+</script>
 </body>
 </html>
