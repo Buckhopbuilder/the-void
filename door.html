@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // Build stamp
-    window.__BUILD = "v12.15";
+    window.__BUILD = "v12.17";
     document.addEventListener("DOMContentLoaded", () => {
       const el = document.getElementById("build-label");
       if(el) el.textContent = `build ${window.__BUILD || "unknown"} (offline master + manual sync + export + loose offline admissibility)`;
@@ -447,7 +447,7 @@
                 <button id="clearOfflinePackBtn">Clear</button>
                 <button id="armOfflineBtn" class="good" style="display:none;">Arm Offline Master</button>
                 <button id="disarmOfflineBtn" class="danger" style="display:none;">Disarm</button>
-                <button id="syncOfflineBtn" class="primary" style="display:none;">Sync Offline</button>
+                <button id="syncOfflineBtn" class="primary" style="display:none;">Sync to backend</button>
                 <button id="exportOfflineBtn" style="display:none;">Export</button>
               </div>
             </div>
@@ -897,13 +897,17 @@ function setSyncReceipt(eventId, receipt){
   try{ localStorage.setItem(lsKeyReceipt(eventId), JSON.stringify(receipt||null)); }catch(_e){}
 }
 
+function isOfflineCheckinAction(action) {
+  return action === "offline_checkin" || action === "offline_checkin_provisional";
+}
+
 function offlinePendingCount(eventId) {
   if(!eventId) return 0;
   const arr = getOfflineLog(eventId);
   // pending = offline_checkin entries not marked synced
   let n = 0;
   for(const e of arr) {
-    if(e && e.action === 'offline_checkin' && !e.synced_at) n++;
+    if(e && isOfflineCheckinAction(e.action) && !e.synced_at) n++;
   }
   return n;
 }
@@ -932,23 +936,34 @@ function refreshOfflineSyncUI() {
     }
 
     // Online
-    if(pending > 0) {
-      offlineSyncStatusEl.style.display = '';
-      offlineSyncStatusEl.textContent = `Offline log: ${pending} pending`;
+    const armed = isMasterArmed(activeEventId);
+
+    // Status line (always visible online when event is active)
+    offlineSyncStatusEl.style.display = '';
+
+    // Sync button visibility: show whenever online + armed (even if nothing pending), so ops never wonder where it went.
+    if(armed) {
       syncOfflineBtn.style.display = '';
-      syncOfflineBtn.disabled = false;
+      syncOfflineBtn.disabled = (pending <= 0);
     } else {
-      offlineSyncStatusEl.style.display = 'none';
-      offlineSyncStatusEl.textContent = '';
       syncOfflineBtn.style.display = 'none';
     }
-  
 
+    // Base status text (receipt may override/extend below)
+    if(!armed) {
+      offlineSyncStatusEl.textContent = 'Online: Offline Master not armed (offline sync disabled on this device).';
+    } else if(pending > 0) {
+      offlineSyncStatusEl.textContent = `Online: ${pending} offline admits pending sync.`;
+    } else {
+      offlineSyncStatusEl.textContent = 'Online: No pending offline admits.';
+    }
+
+    // Show last sync receipt
     // Show last sync receipt if present
     const rec = getSyncReceipt(activeEventId);
     if(rec && offlineSyncStatusEl && navigator.onLine) {
       const when = rec.at ? new Date(rec.at).toLocaleString() : '';
-      const line = `Offline log: ${pending} pending`;
+      const line = pending > 0 ? `Online: ${pending} offline admits pending sync.` : 'Online: No pending offline admits.';
       const receiptLine = `Last sync: ${when} (Applied ${rec.applied||0}, Already ${rec.already||0}, Denied ${rec.denied||0})`;
       offlineSyncStatusEl.textContent = pending > 0 ? (line + ' — ' + receiptLine) : receiptLine;
       offlineSyncStatusEl.style.display = '';
@@ -1000,7 +1015,7 @@ async function syncOfflineLogNow() {
   const newArr = arr.slice();
 
   for(const e of oldestFirst) {
-    if(!e || e.action !== 'offline_checkin' || e.synced_at) continue;
+    if(!e || !isOfflineCheckinAction(e.action) || e.synced_at) continue;
 
     const rid = e.registration_id;
     if(!rid) continue;
@@ -1028,7 +1043,7 @@ async function syncOfflineLogNow() {
 
     // Mark the matching entry in newArr as synced
     for(const ne of newArr) {
-      if(ne && ne.action === 'offline_checkin' && !ne.synced_at && ne.registration_id === rid && ne.ts === e.ts) {
+      if(ne && isOfflineCheckinAction(ne.action) && !ne.synced_at && ne.registration_id === rid && ne.ts === e.ts) {
         ne.synced_at = new Date().toISOString();
         ne.sync_code = ok ? 'applied' : (code || 'denied');
         break;
@@ -1040,7 +1055,7 @@ async function syncOfflineLogNow() {
   // If we didn't fail, prune synced entries to keep log small.
   let finalArr = newArr;
   if(failed == 0) {
-    finalArr = newArr.filter(x => !(x && x.action === 'offline_checkin' && x.synced_at));
+    finalArr = newArr.filter(x => !(x && isOfflineCheckinAction(x.action) && x.synced_at));
   }
 
   saveOfflineLog(activeEventId, finalArr);
@@ -1435,13 +1450,25 @@ async function downloadOfflinePack() {
 
 async function clearOfflinePack() {
   if(!activeEventId) return;
-  try {
-    await idbDeleteOfflinePack(activeEventId);
-  } catch(_e) {}
+
+  const ok = confirm('Clear offline pack AND reset this device's offline ledger/log for this event?
+
+Use this when you need to re-test the same UUIDs.');
+  if(!ok) return;
+
+  try { await idbDeleteOfflinePack(activeEventId); } catch(_e) {}
+
+  // Also clear device-local offline state for this event.
+  try { localStorage.removeItem(lsKeyLedger(activeEventId)); } catch(_e) {}
+  try { localStorage.removeItem(lsKeyLog(activeEventId)); } catch(_e) {}
+  try { localStorage.removeItem(lsKeyReceipt(activeEventId)); } catch(_e) {}
+
   offlinePack = null;
   offlinePackCache = null;
   setOfflinePackUI({ kind: "none" });
+
   try { updateOfflineMasterUI(); } catch(_e) {}
+  try { refreshOfflineSyncUI(); } catch(_e) {}
 }
 
 
@@ -2112,9 +2139,9 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
                 let msg = "Offline scan not accepted.";
                 if(code === "offline_uuid_only") msg = "Offline scanning supports UUID QRs only.";
                 else if(code === "offline_ledger_missing") msg = "Offline ledger missing. Arm Offline Master again.";
-                else if(code === "not_in_offline_pack") msg = "This UUID is not in the offline pack for this event.";
-                else if(code === "already_used") msg = "Already scanned (offline).";
-                setScanStatus(code === "already_used" ? "warn" : "bad", "OFFLINE: " + code);
+                else if(code === "not_in_offline_pack") msg = "Not in the downloaded offline pack. If this is a new registration, re-download the pack while online.";
+                else if(code === "already_used") msg = "Already admitted on this device (offline ledger).";
+                setScanStatus(code === "already_used" ? "warn" : "bad", code === "already_used" ? "OFFLINE: already admitted" : ("OFFLINE: " + code));
                 showOverlay(code === "already_used" ? "warn" : "bad", "OFFLINE", msg, [
                   { text: "OK", cls: "primary", onClick: () => hideOverlay() },
                 ]);
@@ -2125,10 +2152,18 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
               trace.outcome = { ok:true, code:"offline_checked_in", remaining_after: oc.remaining_after };
               if(scanDebugOn) pushScanDebug(trace);
               haptic("good");
-              setScanStatus("good","OFFLINE: checked in");
-              showOverlay("good", "OFFLINE ✅ Checked in", `Remaining entries on this pass: ${oc.remaining_after}`, [
-                { text: "OK", cls: "primary", onClick: () => hideOverlay() },
-              ]);
+
+              if(oc && oc.provisional) {
+                setScanStatus("warn","OFFLINE: provisionally admitted");
+                showOverlay("warn", "OFFLINE ✅ Provisionally admitted", "This pass was NOT in the downloaded pack. It has been admitted on this device and will be reconciled when you sync online.", [
+                  { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+                ]);
+              } else {
+                setScanStatus("good","OFFLINE: checked in");
+                showOverlay("good", "OFFLINE ✅ Checked in", `Remaining entries on this pass (offline ledger): ${oc.remaining_after}`, [
+                  { text: "OK", cls: "primary", onClick: () => hideOverlay() },
+                ]);
+              }
               return;
             }
 
