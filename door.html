@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // Build stamp
-    window.__BUILD = "v12.18";
+    window.__BUILD = "v12.19";
     document.addEventListener("DOMContentLoaded", () => {
       const el = document.getElementById("build-label");
       if(el) el.textContent = `build ${window.__BUILD || "unknown"} (offline master + manual sync + export + messaging/sync polish)`;
@@ -1463,9 +1463,7 @@ async function downloadOfflinePack() {
 async function clearOfflinePack() {
   if(!activeEventId) return;
 
-  const ok = confirm('Clear offline pack AND reset this device's offline ledger/log for this event?
-
-Use this when you need to re-test the same UUIDs.');
+  const ok = confirm("Clear offline pack AND reset this device's offline ledger/log for this event?\n\nUse this when you need to re-test the same UUIDs.");
   if(!ok) return;
 
   try { await idbDeleteOfflinePack(activeEventId); } catch(_e) {}
