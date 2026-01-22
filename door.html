@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // Build stamp
-    window.__BUILD = "v12.19";
+    window.__BUILD = "v12.20";
     document.addEventListener("DOMContentLoaded", () => {
       const el = document.getElementById("build-label");
       if(el) el.textContent = `build ${window.__BUILD || "unknown"} (offline master + manual sync + export + messaging/sync polish)`;
@@ -2087,12 +2087,26 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
   }
   // ==== Scan processing (shared manual + camera) ====
   let scanProcessing = false;
+  let lastProcessedToken = "";
+  let lastProcessedAt = 0;
+  const TOKEN_COOLDOWN_MS = 2500; // prevents rapid re-processing of the same token
 
   async function processScanToken(inputRaw, source="manual") {
+    const raw = normalizeScanInput(inputRaw || "");
+    const now = Date.now();
+
+    // Hard lock: only one scan at a time
     if (scanProcessing) return;
+
+    // Cooldown: ignore rapid repeats of the same token (camera auto-rearm / double listeners / jitter)
+    if (raw && raw === lastProcessedToken && (now - lastProcessedAt) < TOKEN_COOLDOWN_MS) {
+      setScanStatus("warn", "Already processed (cooldown)");
+      return;
+    }
+
     scanProcessing = true;
+    if (raw) { lastProcessedToken = raw; lastProcessedAt = now; }
     try {
-      const raw = normalizeScanInput(inputRaw || "");
       const trace = {
         ts: new Date().toISOString(),
         raw_input: String((source==="manual" && scanPayload) ? (scanPayload.value||"") : (inputRaw||"")),
