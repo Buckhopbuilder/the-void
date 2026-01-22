@@ -11,10 +11,10 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     // Build stamp
-    window.__BUILD = "v12.17";
+    window.__BUILD = "v12.18";
     document.addEventListener("DOMContentLoaded", () => {
       const el = document.getElementById("build-label");
-      if(el) el.textContent = `build ${window.__BUILD || "unknown"} (offline master + manual sync + export + loose offline admissibility)`;
+      if(el) el.textContent = `build ${window.__BUILD || "unknown"} (offline master + manual sync + export + messaging/sync polish)`;
     });
   </script>
   <style>
@@ -437,7 +437,7 @@
             <div class="row" style="justify-content:space-between; gap:10px; align-items:flex-start;">
               <div style="min-width:0;">
                 <div style="font-weight:800;">Offline pack</div>
-                <div class="muted" id="offlinePackStatus">Checking…</div>
+                <div class="muted" id="offlinePackStatus">Not downloaded</div>
                 <div class="muted" id="offlinePackDetails" style="margin-top:6px; display:none;"></div>
                 <div class="muted" id="offlineModeStatus" style="margin-top:6px; display:none;"></div>
                 <div class="muted" id="offlineSyncStatus" style="margin-top:6px; display:none;"></div>
@@ -571,7 +571,8 @@
 
 
 <script>
-window.addEventListener("DOMContentLoaded", () => {
+(function start(){
+  const run = () => {
 
 (() => {
   // ==== Config ====
@@ -1374,6 +1375,17 @@ async function refreshOfflinePackStatus() {
     return;
   }
   setOfflinePackUI({ kind: "checking" });
+  // Watchdog: if we ever get stuck on "Checking…", surface an actionable error instead of hanging silently.
+  try {
+    const startedAt = Date.now();
+    setTimeout(() => {
+      try {
+        if(offlinePackStatusEl && offlinePackStatusEl.textContent === "Checking…") {
+          setOfflinePackUI({ kind: "error", message: "offline pack check stuck", details: "Try refresh with ?cb=... or close other Door tabs." });
+        }
+      } catch(_e) {}
+    }, 4000);
+  } catch(_e) {}
   try {
     const local = await idbGetOfflinePack(activeEventId);
     if(local && local.event_id === activeEventId && Array.isArray(local.registrations)) {
@@ -2928,7 +2940,13 @@ async function rpcDoorCheckinAtomic(registrationId, method) {
 
 })();
 
-});
+  };
+  if (document.readyState === "loading") {
+    window.addEventListener("DOMContentLoaded", run);
+  } else {
+    run();
+  }
+})();
 </script>
 
     <!-- Auth modal -->
