@@ -11,19 +11,13 @@
     :root {
       --bg: #05060a;
       --panel: rgba(255,255,255,0.06);
-      --panel2: rgba(255,255,255,0.10);
       --text: rgba(255,255,255,0.92);
       --muted: rgba(255,255,255,0.65);
-      --ok: rgba(120, 255, 180, 0.95);
-      --bad: rgba(255, 120, 140, 0.95);
-      --accent: rgba(160, 190, 255, 0.95);
       --line: rgba(255,255,255,0.10);
       --shadow: 0 20px 60px rgba(0,0,0,0.45);
     }
-
     * { box-sizing: border-box; }
     html, body { height: 100%; }
-
     body {
       margin: 0;
       font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
@@ -34,128 +28,73 @@
         var(--bg);
       color: var(--text);
     }
-
-    .wrap {
-      width: 100%;
-      max-width: 560px;
-      padding: 22px;
-      margin: 0 auto;
-    }
-
+    .wrap { width: 100%; max-width: 560px; padding: 22px; margin: 0 auto; }
     .card {
       background: linear-gradient(180deg, var(--panel), rgba(255,255,255,0.03));
       border: 1px solid var(--line);
       border-radius: 18px;
       padding: 22px 18px;
       box-shadow: var(--shadow);
+      backdrop-filter: blur(10px);
     }
-
     .brand {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 10px;
-      letter-spacing: 0.2em;
-      font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-bottom: 10px; letter-spacing: 0.2em; font-weight: 700;
     }
-
-    .brand .dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 999px;
-      background: rgba(160,190,255,0.9);
-      box-shadow: 0 0 18px rgba(160,190,255,0.6);
+    .dot {
+      width: 10px; height: 10px; border-radius: 999px;
+      background: rgba(255,255,255,0.75);
+      box-shadow: 0 0 24px rgba(160,190,255,0.55);
     }
-
-    h1 {
-      margin: 6px 0 8px;
-      font-size: 20px;
-      letter-spacing: 0.02em;
-      text-align: center;
-    }
-
-    .muted { color: var(--muted); }
-    .sub {
-      text-align: center;
-      margin: 0 0 16px;
+    h1 { margin: 6px 0 8px; font-size: 20px; text-align: center; letter-spacing: 0.02em; }
+    .sub { text-align: center; margin: 0 0 16px; font-size: 13px; color: var(--muted); line-height: 1.4; }
+    .warn {
+      margin-top: 14px; padding: 12px 12px;
+      background: rgba(255,120,140,0.10);
+      border: 1px solid rgba(255,120,140,0.22);
+      border-radius: 14px;
       font-size: 13px;
-      color: var(--muted);
-      line-height: 1.4;
+      color: rgba(255,220,230,0.95);
+      line-height: 1.45;
     }
-
-    .qrShell {
-      display: flex;
-      justify-content: center;
-      margin: 14px 0 14px;
-    }
-
+    .qrShell { display: flex; justify-content: center; margin: 14px 0 14px; }
     .qrBox {
-      width: 290px;
-      height: 290px;
-      border-radius: 16px;
-      background: #ffffff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      overflow: hidden;
+      width: 290px; height: 290px; border-radius: 16px; background: #ffffff;
+      display: flex; align-items: center; justify-content: center;
       border: 1px solid rgba(0,0,0,0.08);
+      overflow: hidden;
     }
+    /* qrcodejs inserts an <img> or <canvas> inside */
+    #qrcode img, #qrcode canvas { width: 260px !important; height: 260px !important; }
 
-    #qrCanvas {
-      width: 260px;
-      height: 260px;
-    }
-
-    .codeLabel {
-      font-size: 12px;
-      color: var(--muted);
-      margin: 14px 0 8px;
-    }
-
+    .codeLabel { font-size: 12px; color: var(--muted); margin: 14px 0 8px; }
     code {
-      display: block;
-      width: 100%;
+      display: block; width: 100%;
       background: rgba(0,0,0,0.25);
       border: 1px solid var(--line);
       color: rgba(255,255,255,0.92);
       padding: 10px 12px;
       border-radius: 12px;
       word-break: break-all;
-      font-size: 12px;
-      line-height: 1.4;
+      font-size: 12px; line-height: 1.4;
     }
-
-    .row {
-      display: flex;
-      gap: 10px;
-      margin-top: 14px;
-    }
-
+    .row { display: flex; gap: 10px; margin-top: 14px; }
     .btn {
       width: 100%;
       border: 0;
-      background: rgba(160,190,255,0.18);
+      background: rgba(255,255,255,0.08);
       color: var(--text);
       padding: 12px 14px;
       border-radius: 12px;
       font-weight: 700;
-      letter-spacing: 0.02em;
       cursor: pointer;
-      border: 1px solid rgba(160,190,255,0.22);
-      transition: transform 0.06s ease, background 0.15s ease;
+      border: 1px solid var(--line);
       text-align: center;
       text-decoration: none;
       display: inline-block;
+      transition: transform 0.06s ease;
     }
     .btn:active { transform: translateY(1px); }
-    .btn.secondary {
-      background: rgba(255,255,255,0.08);
-      border: 1px solid var(--line);
-      font-weight: 700;
-    }
-
     .notice {
       margin-top: 14px;
       padding: 12px 12px;
@@ -166,42 +105,11 @@
       color: var(--muted);
       line-height: 1.45;
     }
-
-    .warn {
-      margin-top: 14px;
-      padding: 12px 12px;
-      background: rgba(255,120,140,0.10);
-      border: 1px solid rgba(255,120,140,0.22);
-      border-radius: 14px;
-      font-size: 13px;
-      color: rgba(255,220,230,0.95);
-      line-height: 1.45;
-    }
-
-    .eventBox {
-      margin-top: 12px;
-      padding: 12px 12px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid var(--line);
-      border-radius: 14px;
-    }
-    .eventTitle { font-weight: 800; margin: 0 0 6px; }
-    .eventRow { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
-    .eventRow b { color: rgba(255,255,255,0.9); font-weight: 700; }
-
-    .tiny {
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--muted);
-      text-align: center;
-    }
+    .tiny { margin-top: 10px; font-size: 12px; color: var(--muted); text-align: center; }
   </style>
 
-  <!-- Supabase (same approach as your other pages) -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-
-  <!-- QR generation library (small, browser-friendly) -->
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+  <!-- QR library: reliable, simple -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 </head>
 
 <body>
@@ -220,24 +128,15 @@
       <div id="main" style="display:none;">
         <div class="qrShell">
           <div class="qrBox">
-            <canvas id="qrCanvas" width="260" height="260"></canvas>
+            <div id="qrcode" aria-label="QR Code"></div>
           </div>
         </div>
 
         <div class="codeLabel">Ticket code (UUID)</div>
         <code id="code"></code>
 
-        <div id="eventBox" class="eventBox" style="display:none;">
-          <div class="eventTitle" id="eventName"></div>
-          <p class="eventRow" id="eventReveal"></p>
-          <p class="eventRow" id="eventNote" style="margin-top:6px;"></p>
-          <div class="row" style="margin-top:12px;">
-            <a id="mapsBtn" class="btn secondary" href="#" target="_blank" rel="noopener" style="display:none;">Open Maps</a>
-          </div>
-        </div>
-
         <div class="row">
-          <button id="screenshotBtn" class="btn secondary" type="button">Screenshot Tip</button>
+          <button id="screenshotBtn" class="btn" type="button">Screenshot Tip</button>
           <a class="btn" href="/index.html">Back</a>
         </div>
 
@@ -252,20 +151,14 @@
 
 <script>
 (() => {
-  // Copied from your existing index.html
-  const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
-  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzU2NjQxMzYsImV4cCI6MjA1MTI0MDEzNn0.GyckYVeHcSA4W7g9L8N-gdX1sv6nUj0EjwGPDwYgCK4";
-
   const params = new URLSearchParams(window.location.search);
   const id = (params.get("id") || "").trim();
 
-  // Simple UUID-like validation (enough to avoid rendering junk)
   const uuidLike = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(id);
 
   const missingEl = document.getElementById("missing");
   const mainEl = document.getElementById("main");
   const codeEl = document.getElementById("code");
-  const canvas = document.getElementById("qrCanvas");
 
   if (!uuidLike) {
     missingEl.style.display = "block";
@@ -275,61 +168,25 @@
   mainEl.style.display = "block";
   codeEl.textContent = id;
 
+  // Clear container (in case browser cached and re-runs)
+  const q = document.getElementById("qrcode");
+  q.innerHTML = "";
+
   // Render QR
-  QRCode.toCanvas(canvas, id, {
-    errorCorrectionLevel: "M",
-    margin: 1,
-    scale: 8
-  }).catch(() => {
-    // If QR lib fails for any reason, user still has the text code.
-  });
+  try {
+    new QRCode(q, {
+      text: id,
+      width: 260,
+      height: 260,
+      correctLevel: QRCode.CorrectLevel.M
+    });
+  } catch (e) {
+    // If something truly breaks, user still has the text UUID
+  }
 
   document.getElementById("screenshotBtn").addEventListener("click", () => {
     alert("Take a screenshot of this page now. If reception is bad later, you can still show the QR from your photos.");
   });
-
-  // Optional: show public active event info (fails silently)
-  async function loadPublicEvent() {
-    try {
-      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-      const { data, error } = await client
-        .from("public_active_event")
-        .select("*")
-        .maybeSingle();
-
-      if (error || !data) return;
-
-      const eventBox = document.getElementById("eventBox");
-      const eventName = document.getElementById("eventName");
-      const eventReveal = document.getElementById("eventReveal");
-      const eventNote = document.getElementById("eventNote");
-      const mapsBtn = document.getElementById("mapsBtn");
-
-      eventBox.style.display = "block";
-      eventName.textContent = data.name || "Event";
-
-      if (data.reveal_at) {
-        const dt = new Date(data.reveal_at);
-        eventReveal.innerHTML = "<b>Reveal:</b> " + dt.toLocaleString();
-      } else {
-        eventReveal.textContent = "";
-      }
-
-      // If your view exposes location details/maps_url only after reveal, this will naturally remain blank pre-reveal.
-      const mapsUrl = data.maps_url || "";
-      if (mapsUrl) {
-        mapsBtn.href = mapsUrl;
-        mapsBtn.style.display = "inline-block";
-        eventNote.textContent = "Tip: save this page (screenshot) so you have it even if reception drops.";
-      } else {
-        eventNote.textContent = "Location link will appear here when available.";
-      }
-    } catch (_) {
-      // ignore
-    }
-  }
-
-  loadPublicEvent();
 })();
 </script>
 </body>
