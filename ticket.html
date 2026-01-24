@@ -106,10 +106,23 @@
       line-height: 1.45;
     }
     .tiny { margin-top: 10px; font-size: 12px; color: var(--muted); text-align: center; }
+
+    .eventBox {
+      margin-top: 14px;
+      padding: 12px 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+    }
+    .eventTitle { font-weight: 800; margin: 0 0 6px; text-align: center; letter-spacing: 0.06em; }
+    .eventRow { margin: 0; font-size: 13px; color: var(--muted); text-align: center; line-height: 1.4; }
+    .eventRow b { color: rgba(255,255,255,0.92); font-weight: 800; }
+    .eventBtnRow { display:flex; gap:10px; margin-top:12px; }
   </style>
 
   <!-- QR library: reliable, simple -->
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 
 <body>
@@ -135,6 +148,16 @@
         <div class="codeLabel">Ticket code (UUID)</div>
         <code id="code"></code>
 
+
+        <div id="eventBox" class="eventBox" style="display:none;">
+          <div class="eventTitle" id="eventName"></div>
+          <p class="eventRow" id="eventReveal"></p>
+          <p class="eventRow" id="eventNote" style="margin-top:6px;"></p>
+          <div class="eventBtnRow">
+            <a id="mapsBtn" class="btn" href="#" target="_blank" rel="noopener" style="display:none;">Open Maps</a>
+          </div>
+        </div>
+
         <div class="row">
           <button id="screenshotBtn" class="btn" type="button">Screenshot Tip</button>
           <a class="btn" href="/index.html">Back</a>
@@ -151,6 +174,9 @@
 
 <script>
 (() => {
+  const SUPABASE_URL = "https://xhitzrnmowqeaerofion.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhoaXR6cm5tb3dxZWFlcm9maW9uIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYyNDY5MjYsImV4cCI6MjA4MTgyMjkyNn0.rMRAn3-3afUE4HEA4-RJ8ZB7jiqUVY9_ItU_2461Mvk";
+
   const params = new URLSearchParams(window.location.search);
   const id = (params.get("id") || "").trim();
 
@@ -187,6 +213,50 @@
   document.getElementById("screenshotBtn").addEventListener("click", () => {
     alert("Take a screenshot of this page now. If reception is bad later, you can still show the QR from your photos.");
   });
+
+  async function loadPublicEvent() {
+    try {
+      if (!window.supabase || !SUPABASE_ANON_KEY) return;
+
+      const client = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+      const { data, error } = await client
+        .from("public_active_event")
+        .select("*")
+        .maybeSingle();
+
+      if (error || !data) return;
+
+      const box = document.getElementById("eventBox");
+      const nameEl = document.getElementById("eventName");
+      const revealEl = document.getElementById("eventReveal");
+      const noteEl = document.getElementById("eventNote");
+      const mapsBtn = document.getElementById("mapsBtn");
+
+      box.style.display = "block";
+      nameEl.textContent = data.name || "Event";
+
+      if (data.reveal_at) {
+        const dt = new Date(data.reveal_at);
+        revealEl.innerHTML = "<b>Reveal:</b> " + dt.toLocaleString();
+      } else {
+        revealEl.textContent = "";
+      }
+
+      const mapsUrl = data.maps_url || "";
+      if (mapsUrl) {
+        mapsBtn.href = mapsUrl;
+        mapsBtn.style.display = "inline-block";
+        noteEl.textContent = "Tip: screenshot this page so you have the QR even if reception drops.";
+      } else {
+        noteEl.textContent = "Location link will appear here when available.";
+      }
+    } catch (_) {
+      // Ignore: ticket page must work even if this fails
+    }
+  }
+
+  loadPublicEvent();
+
 })();
 </script>
 </body>
